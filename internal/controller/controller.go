@@ -17,27 +17,45 @@ import (
 )
 
 type MessageType interface {
-	Name() string
+	Validate() error
 }
 
 type Poll struct{}
 
-func (p Poll) Name() string {
-	return "Poll"
+func (p Poll) Validate() error {
+	// Nothing to do
+	return nil
 }
 
-type Trigger struct{}
+type Trigger struct {
+	ImageName     string `json:"image_name"`
+	ImageTag      string `json:"image_tag"`
+	ContainerName string `json:"container_name"`
+}
 
-func (p Trigger) Name() string {
-	return "Trigger"
+func (p Trigger) Validate() error {
+	// Check that the details are all non-empty
+	if p.ImageName == "" {
+		return fmt.Errorf("validation error: empty image name")
+	}
+
+	if p.ImageTag == "" {
+		return fmt.Errorf("validation error: empty image tag")
+	}
+
+	if p.ContainerName == "" {
+		return fmt.Errorf("validation error: empty container name")
+	}
+
+	return nil
 }
 
 type WebHook struct {
 	Event gitlab.PipelineEvent
 }
 
-func (p WebHook) Name() string {
-	return "WebHook"
+func (p WebHook) Validate() error {
+	return nil
 }
 
 type Controller struct {
@@ -72,7 +90,27 @@ func NewController(opts NewControllerOptions) (*Controller, error) {
 	// Set up web server
 	r := gin.Default()
 	r.POST("/trigger", func(c *gin.Context) {
-		inbox <- Trigger{}
+		var t Trigger
+
+		if err := c.ShouldBind(&t); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"status":     "error",
+				"error":      err.Error(),
+				"error_type": "decoding",
+			})
+			return
+		}
+
+		if err := t.Validate(); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"status":     "error",
+				"error":      err.Error(),
+				"error_type": "validation",
+			})
+			return
+		}
+
+		inbox <- t
 		c.JSON(200, gin.H{
 			"status": "ok",
 		})
@@ -88,9 +126,21 @@ func NewController(opts NewControllerOptions) (*Controller, error) {
 			return
 		}
 
-		inbox <- WebHook{
+		msg := WebHook{
 			Event: event,
 		}
+
+		if err := msg.Validate(); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"status":     "error",
+				"error":      err.Error(),
+				"error_type": "validation",
+			})
+			return
+		}
+
+		inbox <- msg
+
 		c.JSON(200, gin.H{
 			"status": "ok",
 		})
@@ -140,24 +190,31 @@ func (c *Controller) poll(p Poll) error {
 }
 
 func (c *Controller) trigger(t Trigger) error {
-	return nil
+	return c.refreshImage(t)
 }
 
 func (c *Controller) webhook(w WebHook) error {
-	return c.refreshImage(c.cfg.Image.Name, c.cfg.Image.Tag, c.cfg.Container.Name)
+	// return c.refreshImage(c.cfg)
+	trigger := Trigger{
+		ImageName:     c.cfg.Image.Name,
+		ImageTag:      c.cfg.Image.Tag,
+		ContainerName: c.cfg.Container.Name,
+	}
+
+	return c.refreshImage(trigger)
 }
 
-func (c *Controller) refreshImage(name string, image string, tag string) error {
+func (c *Controller) refreshImage(t Trigger) error {
 	// Implementation is to pull the previous image, then remove the current
 	// image and run the new image in its place
-	ref := fmt.Sprintf("%s:%s", image, tag)
+	ref := fmt.Sprintf("%s:%s", t.ImageName, t.ImageTag)
 	_, err := c.client.ImagePull(context.Background(), ref, types.ImagePullOptions{})
 	if err != nil {
 		return err
 	}
 
 	// Remove the currently running container
-	err = c.client.ContainerRemove(context.Background(), name, types.ContainerRemoveOptions{
+	err = c.client.ContainerRemove(context.Background(), t.ContainerName, types.ContainerRemoveOptions{
 		Force: true,
 	})
 	if err != nil {
@@ -165,8 +222,18 @@ func (c *Controller) refreshImage(name string, image string, tag string) error {
 	}
 
 	// Start container again
-	containerConfig := container.Config{}
-	hostConfig := container.HostConfig{}
+	containerConfig := container.Config{
+		// Cmd:   []string{},
+		Image: ref,
+	}
+	hostConfig := container.HostConfig{
+		// TODO
+		PortBindings: nil,
+		// TODO
+		AutoRemove: true,
+		// TODO
+		Mounts: nil,
+	}
 	networkConfig := network.NetworkingConfig{}
 
 	_, err = c.client.ContainerCreate(
@@ -174,7 +241,7 @@ func (c *Controller) refreshImage(name string, image string, tag string) error {
 		&containerConfig,
 		&hostConfig,
 		&networkConfig,
-		name,
+		t.ContainerName,
 	)
 	if err != nil {
 		return err
