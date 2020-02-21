@@ -207,14 +207,19 @@ func (c *Controller) webhook(w WebHook) error {
 func (c *Controller) refreshImage(t Trigger) error {
 	// Implementation is to pull the previous image, then remove the current
 	// image and run the new image in its place
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Second)
+	defer cancel()
+
 	ref := fmt.Sprintf("%s:%s", t.ImageName, t.ImageTag)
-	_, err := c.client.ImagePull(context.Background(), ref, types.ImagePullOptions{})
+	log.Printf("refreshing image %s", ref)
+	_, err := c.client.ImagePull(ctx, ref, types.ImagePullOptions{})
 	if err != nil {
+		log.Printf("error pulling image %s: %v", ref, err)
 		return err
 	}
 
 	// Remove the currently running container
-	err = c.client.ContainerRemove(context.Background(), t.ContainerName, types.ContainerRemoveOptions{
+	err = c.client.ContainerRemove(ctx, t.ContainerName, types.ContainerRemoveOptions{
 		Force: true,
 	})
 	if err != nil {
@@ -237,7 +242,7 @@ func (c *Controller) refreshImage(t Trigger) error {
 	networkConfig := network.NetworkingConfig{}
 
 	_, err = c.client.ContainerCreate(
-		context.Background(),
+		ctx,
 		&containerConfig,
 		&hostConfig,
 		&networkConfig,
