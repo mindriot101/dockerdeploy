@@ -236,9 +236,9 @@ func (c *Controller) refreshImage(t Trigger) error {
 		}
 	}
 
-	// Start container again
+	log.Printf("starting container %s with image %s", t.ContainerName, ref)
 	containerConfig := container.Config{
-		// Cmd:   []string{},
+		Cmd:   []string{"sleep", "86400"},
 		Image: ref,
 	}
 	hostConfig := container.HostConfig{
@@ -251,7 +251,7 @@ func (c *Controller) refreshImage(t Trigger) error {
 	}
 	networkConfig := network.NetworkingConfig{}
 
-	_, err = c.client.ContainerCreate(
+	created, err := c.client.ContainerCreate(
 		ctx,
 		&containerConfig,
 		&hostConfig,
@@ -261,6 +261,13 @@ func (c *Controller) refreshImage(t Trigger) error {
 	if err != nil {
 		return err
 	}
+
+	// Inspect the `created` object to get information about the container creation process
+	for _, warning := range created.Warnings {
+		log.Printf("WARNING: %s", warning)
+	}
+
+	log.Printf("created container with id %s", created.ID)
 
 	return nil
 }
