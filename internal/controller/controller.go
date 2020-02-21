@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/network"
 	"github.com/gin-gonic/gin"
 	"github.com/mindriot101/dockerdeploy/internal/config"
 	"github.com/xanzy/go-gitlab"
@@ -142,10 +144,38 @@ func (c *Controller) trigger(t Trigger) error {
 }
 
 func (c *Controller) webhook(w WebHook) error {
+	return c.refreshImage(c.cfg.Image.Name, c.cfg.Image.Tag, c.cfg.Container.Name)
+}
+
+func (c *Controller) refreshImage(name string, image string, tag string) error {
 	// Implementation is to pull the previous image, then remove the current
 	// image and run the new image in its place
-	ref := fmt.Sprintf("%s:%s", c.cfg.Image.Name, c.cfg.Image.Tag)
+	ref := fmt.Sprintf("%s:%s", image, tag)
 	_, err := c.client.ImagePull(context.Background(), ref, types.ImagePullOptions{})
+	if err != nil {
+		return err
+	}
+
+	// Remove the currently running container
+	err = c.client.ContainerRemove(context.Background(), name, types.ContainerRemoveOptions{
+		Force: true,
+	})
+	if err != nil {
+		return err
+	}
+
+	// Start container again
+	containerConfig := container.Config{}
+	hostConfig := container.HostConfig{}
+	networkConfig := network.NetworkingConfig{}
+
+	_, err = c.client.ContainerCreate(
+		context.Background(),
+		&containerConfig,
+		&hostConfig,
+		&networkConfig,
+		name,
+	)
 	if err != nil {
 		return err
 	}
@@ -155,4 +185,7 @@ func (c *Controller) webhook(w WebHook) error {
 
 type DockerClient interface {
 	ImagePull(ctx context.Context, ref string, options types.ImagePullOptions) (io.ReadCloser, error)
+	ContainerRemove(ctx context.Context, containerID string, options types.ContainerRemoveOptions) error
+	ContainerCreate(ctx context.Context, config *container.Config, hostConfig *container.HostConfig,
+		networkingConfig *network.NetworkingConfig, containerName string) (container.ContainerCreateCreatedBody, error)
 }

@@ -24,6 +24,7 @@ type Image struct {
 type Container struct {
 	Ports  []Port  `yaml:"ports"`
 	Mounts []Mount `yaml:"mounts"`
+	Name   string  `yaml:"name"`
 }
 
 type Port struct {

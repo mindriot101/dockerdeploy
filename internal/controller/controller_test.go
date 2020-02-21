@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/network"
 	"github.com/mindriot101/dockerdeploy/internal/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/xanzy/go-gitlab"
@@ -41,6 +43,17 @@ func (d *MockDockerClient) ImagePull(ctx context.Context, ref string, options ty
 	return nil, nil
 }
 
+func (d *MockDockerClient) ContainerRemove(ctx context.Context, containerID string, options types.ContainerRemoveOptions) error {
+	d.instructions = append(d.instructions, fmt.Sprintf("removing container %s with options %v", containerID, options))
+	return nil
+}
+
+func (d *MockDockerClient) ContainerCreate(ctx context.Context, config *container.Config, hostConfig *container.HostConfig, networkingConfig *network.NetworkingConfig, containerName string) (container.ContainerCreateCreatedBody, error) {
+	d.instructions = append(d.instructions, fmt.Sprintf("creating container %s", containerName))
+	body := container.ContainerCreateCreatedBody{}
+	return body, nil
+}
+
 func TestHandleWebhookRequest(t *testing.T) {
 	c, err := dummyController()
 	assert.Nil(t, err)
@@ -54,6 +67,8 @@ func TestHandleWebhookRequest(t *testing.T) {
 	assert.Nil(t, err)
 	client, ok := c.client.(*MockDockerClient)
 	assert.True(t, ok)
-	assert.Len(t, client.instructions, 1)
+	assert.Len(t, client.instructions, 3)
 	assert.Contains(t, client.instructions[0], "pulling image")
+	assert.Contains(t, client.instructions[1], "removing container")
+	assert.Contains(t, client.instructions[2], "creating container")
 }
