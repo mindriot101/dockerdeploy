@@ -213,11 +213,12 @@ func (c *Controller) refreshImage(t Trigger) error {
 
 	ref := fmt.Sprintf("%s:%s", t.ImageName, t.ImageTag)
 	log.Printf("refreshing image %s", ref)
-	_, err := c.client.ImagePull(ctx, ref, types.ImagePullOptions{})
+	rc, err := c.client.ImagePull(ctx, ref, types.ImagePullOptions{})
 	if err != nil {
 		log.Printf("error pulling image %s: %v", ref, err)
 		return err
 	}
+	defer rc.Close()
 
 	// Remove the currently running container
 	err = c.client.ContainerRemove(ctx, t.ContainerName, types.ContainerRemoveOptions{
