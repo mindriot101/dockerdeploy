@@ -23,10 +23,5 @@ jobs:
     - name: Build
       run: make build
 
-  test:
-    name: Test
-    runs-on: ubuntu-latest
-    steps:
     - name: Test
       run: go test -count=1 ./...
-
