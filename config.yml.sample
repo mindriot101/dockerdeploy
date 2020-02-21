@@ -1,0 +1,16 @@
+image:
+  name: ubuntu
+  tag: latest
+container:
+  ports:
+    - host: 8080
+      target: 80
+  mounts:
+    - host: $PWD/data
+      target: /data
+branch:
+  name: master
+  build_on_failure: false
+heartbeat:
+  sleep_time: 10
+  endpoint: /heartbeat
