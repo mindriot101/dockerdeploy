@@ -4,8 +4,8 @@ BINARY := dockerdeploy
 .PHONY: build
 build: ${BINARY}
 
-dockerdeploy: $(wildcard *.go)
-	go build -o $@ -ldflags "-X main.sha1ver=$(shell git rev-parse HEAD) -X main.buildTime=${NOW}" .
+dockerdeploy: $(wildcard cmd/dockerdeploy/*.go)
+	go build -o $@ -ldflags "-X main.sha1ver=$(shell git rev-parse HEAD) -X main.buildTime=${NOW}" $<
 
 .PHONY: clean
 clean:
