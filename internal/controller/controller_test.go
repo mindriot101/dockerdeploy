@@ -16,6 +16,6 @@ func dummyController() Controller {
 func TestHandlePollInstruction(t *testing.T) {
 	c := dummyController()
 
-	err := c.handle(Poll)
+	err := c.handle(Poll{})
 	assert.Nil(t, err)
 }
