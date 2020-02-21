@@ -1,7 +1,21 @@
 package main
 
-import "fmt"
+import (
+	"flag"
+	"fmt"
+)
+
+var (
+	sha1ver   string
+	buildTime string
+)
 
 func main() {
-	fmt.Println("Hello world")
+	version := flag.Bool("version", false, "Print the program version")
+	flag.Parse()
+
+	if *version {
+		fmt.Printf("Binary sha %s built on %s\n", sha1ver, buildTime)
+		return
+	}
 }
