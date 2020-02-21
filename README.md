@@ -1,5 +1,7 @@
 # Docker deploy
 
+![Go](https://github.com/mindriot101/dockerdeploy/workflows/Go/badge.svg?branch=master)
+
 This process is a daemon that:
 
 - exposes a web server that can trigger a docker pull
