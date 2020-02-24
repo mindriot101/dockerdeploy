@@ -196,7 +196,15 @@ func (c *Controller) trigger(t Trigger) error {
 }
 
 func (c *Controller) webhook(w WebHook) error {
-	// return c.refreshImage(c.cfg)
+
+	// Check that the pipeline event is from the branch that we care about
+	eventBranch := w.Event.ObjectAttributes.Ref
+	watchedBranch := c.cfg.Branch.Name
+	if eventBranch != watchedBranch {
+		log.Printf("pipeline event found for branch that is not being monitored, found %s expected %s", eventBranch, watchedBranch)
+		return nil
+	}
+
 	trigger := Trigger{
 		ImageName:     c.cfg.Image.Name,
 		ImageTag:      c.cfg.Image.Tag,

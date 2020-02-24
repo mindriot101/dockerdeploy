@@ -114,3 +114,34 @@ func TestHandleWebhookRequest(t *testing.T) {
 		t.Fatalf("fourth instruction should be starting the new container")
 	}
 }
+
+func TestHandleNonConfiguredBranch(t *testing.T) {
+	c, err := dummyController()
+	if err != nil {
+		t.Fatalf("error creating dummy controller: %v", err)
+	}
+
+	// Set the config parameters
+	c.cfg.Branch.Name = "master"
+
+	// Set the event to have a different branch
+	event := gitlab.PipelineEvent{}
+	event.ObjectAttributes.Ref = "canary"
+	msg := WebHook{
+		Event: event,
+	}
+
+	err = c.handle(msg)
+	if err != nil {
+		t.Fatalf("error handling WebHook message: %v", err)
+	}
+
+	client, ok := c.client.(*MockDockerClient)
+	if !ok {
+		t.Fatalf("error casting docker client to concrete type")
+	}
+
+	if len(client.instructions) != 0 {
+		t.Fatalf("client should have not run deployment, found %d instructions", len(client.instructions))
+	}
+}
