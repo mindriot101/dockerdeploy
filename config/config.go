@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"io/ioutil"
 
 	"gopkg.in/yaml.v2"
@@ -66,4 +67,27 @@ func Parse(filename string) (*Config, error) {
 	}
 
 	return parseString(t)
+}
+
+// Validate the configuration value to make sure any required parameters are not missing
+func (c *Config) Validate() error {
+	// Errors
+	if c.Container.Name == "" {
+		return fmt.Errorf("validation error: container name can not be empty")
+	}
+
+	if c.Image.Name == "" {
+		return fmt.Errorf("validation error: image name can not be empty")
+	}
+
+	if c.Branch.Name == "" {
+		return fmt.Errorf("validation error: branch name can not be empty")
+	}
+
+	// Defaults
+	if c.Image.Tag == "" {
+		c.Image.Tag = "latest"
+	}
+
+	return nil
 }

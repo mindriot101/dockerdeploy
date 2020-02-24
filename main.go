@@ -37,6 +37,10 @@ func main() {
 		log.Fatal(err)
 	}
 
+	if err = cfg.Validate(); err != nil {
+		log.Fatal(err)
+	}
+
 	// Create the docker client
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {

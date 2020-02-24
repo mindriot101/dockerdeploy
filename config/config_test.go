@@ -1,6 +1,7 @@
 package config
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -17,6 +18,7 @@ container:
   mounts:
     - host: $PWD/data
       target: /data
+  name: foobar
 branch:
   name: master
   build_on_failure: false
@@ -27,9 +29,12 @@ heartbeat:
 
 func TestParseConfig(t *testing.T) {
 	cfg, err := parseString([]byte(config))
-
 	if err != nil {
 		t.Fatalf("error parsing config string: %v", err)
+	}
+
+	if err = cfg.Validate(); err != nil {
+		t.Fatalf("test config is not valid: %v", err)
 	}
 
 	expectedImage := Image{
@@ -53,6 +58,7 @@ func TestParseConfig(t *testing.T) {
 				Target: "/data",
 			},
 		},
+		Name: "foobar",
 	}
 
 	if !cmp.Equal(cfg.Container, expectedContainer) {
@@ -77,4 +83,64 @@ func TestParseConfig(t *testing.T) {
 }
 
 func TestValidation(t *testing.T) {
+	cfg, err := parseString([]byte(config))
+
+	{
+		orig := cfg.Container.Name
+		cfg.Container.Name = ""
+		err = cfg.Validate()
+		if err == nil {
+			t.Fatalf("validation should not pass with empty container name")
+		}
+
+		if !strings.Contains(err.Error(), "container name can not be empty") {
+			t.Fatalf("error validating empty container name")
+		}
+		cfg.Container.Name = orig
+	}
+
+	{
+		orig := cfg.Image.Name
+		cfg.Image.Name = ""
+		err = cfg.Validate()
+		if err == nil {
+			t.Fatalf("validation should not pass with empty image name")
+		}
+
+		if !strings.Contains(err.Error(), "image name can not be empty") {
+			t.Fatalf("error validating empty image name")
+		}
+		cfg.Image.Name = orig
+	}
+
+	{
+		orig := cfg.Branch.Name
+		cfg.Branch.Name = ""
+		err = cfg.Validate()
+		if err == nil {
+			t.Fatalf("validation should not pass with empty branch name")
+		}
+
+		if !strings.Contains(err.Error(), "branch name can not be empty") {
+			t.Fatalf("error validating empty branch name")
+		}
+		cfg.Branch.Name = orig
+	}
+}
+
+func TestSaneDefaults(t *testing.T) {
+	cfg, err := parseString([]byte(config))
+
+	{
+		cfg.Image.Tag = ""
+		err = cfg.Validate()
+		if err != nil {
+			t.Fatalf("validation should pass")
+		}
+
+		if cfg.Image.Tag != "latest" {
+			t.Fatalf("validation method did not set default tag")
+		}
+	}
+
 }
