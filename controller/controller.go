@@ -7,12 +7,12 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
+	"github.com/docker/docker/client"
 	"github.com/gin-gonic/gin"
 	"github.com/mindriot101/dockerdeploy/config"
 	"github.com/xanzy/go-gitlab"
@@ -231,13 +231,7 @@ func (c *Controller) refreshImage(t Trigger) error {
 		Force: true,
 	})
 	if err != nil {
-		// XXX there does not seem to be a good way to get whether the
-		// container could not be found, or that another error occurs. Despite
-		// all of my attempts, `client.IsErrNotFound` does not return the
-		// correct thing, even though the error message clearly states that the
-		// container cannot be found. We therefore have to resort to this
-		// string checking which feels dirty
-		if !strings.Contains(err.Error(), "No such container") {
+		if !client.IsErrNotFound(err) {
 			return err
 		}
 	}
