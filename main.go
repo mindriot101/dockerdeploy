@@ -5,6 +5,7 @@ import (
 	"log"
 
 	"github.com/docker/docker/client"
+	"github.com/gin-gonic/gin"
 	"github.com/mindriot101/dockerdeploy/config"
 	"github.com/mindriot101/dockerdeploy/controller"
 )
@@ -49,5 +50,13 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Fatal(controller.Run())
+
+	// Create the web server
+	r := gin.Default()
+	r.POST("/trigger", controller.HandleTrigger)
+	r.POST("/webhook", controller.HandleWebHook)
+
+	controller.Listen()
+
+	log.Fatal(r.Run())
 }

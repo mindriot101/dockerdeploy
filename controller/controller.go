@@ -62,7 +62,6 @@ func (p WebHook) Validate() error {
 
 type Controller struct {
 	inbox  chan MessageType
-	server *gin.Engine
 	client DockerClient
 	cfg    *config.Config
 }
@@ -89,74 +88,74 @@ func NewController(opts NewControllerOptions) (*Controller, error) {
 		}
 	}()
 
-	// Set up web server
-	r := gin.Default()
-	r.POST("/trigger", func(c *gin.Context) {
-		var t Trigger
-
-		if err := c.ShouldBind(&t); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"status":     "error",
-				"error":      err.Error(),
-				"error_type": "decoding",
-			})
-			return
-		}
-
-		if err := t.Validate(); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"status":     "error",
-				"error":      err.Error(),
-				"error_type": "validation",
-			})
-			return
-		}
-
-		inbox <- t
-		c.JSON(200, gin.H{
-			"status": "ok",
-		})
-	})
-	r.POST("/webhook", func(c *gin.Context) {
-		var event gitlab.PipelineEvent
-
-		if err := c.ShouldBind(&event); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"status": "error",
-				"error":  err.Error(),
-			})
-			return
-		}
-
-		msg := WebHook{
-			Event: event,
-		}
-
-		if err := msg.Validate(); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"status":     "error",
-				"error":      err.Error(),
-				"error_type": "validation",
-			})
-			return
-		}
-
-		inbox <- msg
-
-		c.JSON(200, gin.H{
-			"status": "ok",
-		})
-	})
-
 	return &Controller{
 		inbox:  inbox,
 		cfg:    opts.Cfg,
-		server: r,
 		client: opts.Client,
 	}, nil
 }
 
-func (c Controller) Run() error {
+// Web route handlers
+func (c *Controller) HandleTrigger(ctx *gin.Context) {
+	var t Trigger
+
+	if err := ctx.ShouldBind(&t); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"status":     "error",
+			"error":      err.Error(),
+			"error_type": "decoding",
+		})
+		return
+	}
+
+	if err := t.Validate(); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"status":     "error",
+			"error":      err.Error(),
+			"error_type": "validation",
+		})
+		return
+	}
+
+	c.inbox <- t
+
+	ctx.JSON(200, gin.H{
+		"status": "ok",
+	})
+}
+
+func (c *Controller) HandleWebHook(ctx *gin.Context) {
+	var event gitlab.PipelineEvent
+
+	if err := ctx.ShouldBind(&event); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"status": "error",
+			"error":  err.Error(),
+		})
+		return
+	}
+
+	msg := WebHook{
+		Event: event,
+	}
+
+	if err := msg.Validate(); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"status":     "error",
+			"error":      err.Error(),
+			"error_type": "validation",
+		})
+		return
+	}
+
+	c.inbox <- msg
+
+	ctx.JSON(200, gin.H{
+		"status": "ok",
+	})
+}
+
+func (c *Controller) Listen() {
 	go func() {
 		for {
 			msg := <-c.inbox
@@ -166,9 +165,6 @@ func (c Controller) Run() error {
 			}
 		}
 	}()
-
-	// Start the web server
-	return c.server.Run()
 }
 
 func (c Controller) handle(msg MessageType) error {
