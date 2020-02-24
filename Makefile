@@ -1,11 +1,8 @@
 NOW := $(shell date +'%Y-%m-%dT%T')
 BINARY := dockerdeploy
 
-.PHONY: build
-build: ${BINARY}
-
-dockerdeploy: $(wildcard **/*.go)
-	go build -o $@ -ldflags "-X main.sha1ver=$(shell git rev-parse HEAD) -X main.buildTime=${NOW}" main.go
+build:
+	go build -o ${BINARY} -ldflags "-X main.sha1ver=$(shell git rev-parse HEAD) -X main.buildTime=${NOW}" main.go
 
 .PHONY: clean
 clean:
