@@ -184,6 +184,14 @@ func (c *Controller) webhook(w WebHook) error {
 		return nil
 	}
 
+	// Do not perform the work if any of the builds were unsuccessful
+	for _, build := range w.Event.Builds {
+		if build.Status != string(Successful) {
+			log.Printf("found unsuccessful build: %+v, skipping deploy", build)
+			return nil
+		}
+	}
+
 	trigger := Trigger{
 		ImageName:     c.cfg.Image.Name,
 		ImageTag:      c.cfg.Image.Tag,

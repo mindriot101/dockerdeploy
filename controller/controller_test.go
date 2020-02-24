@@ -149,3 +149,67 @@ func TestHandleNonConfiguredBranch(t *testing.T) {
 		t.Fatalf("client should have not run deployment, found %d instructions", len(client.instructions))
 	}
 }
+
+func TestNonSuccessfulBuild(t *testing.T) {
+	type Build struct {
+		ID         int    `json:"id"`
+		Stage      string `json:"stage"`
+		Name       string `json:"name"`
+		Status     string `json:"status"`
+		CreatedAt  string `json:"created_at"`
+		StartedAt  string `json:"started_at"`
+		FinishedAt string `json:"finished_at"`
+		When       string `json:"when"`
+		Manual     bool   `json:"manual"`
+		User       struct {
+			Name      string `json:"name"`
+			Username  string `json:"username"`
+			AvatarURL string `json:"avatar_url"`
+		} `json:"user"`
+		Runner struct {
+			ID          int    `json:"id"`
+			Description string `json:"description"`
+			Active      bool   `json:"active"`
+			IsShared    bool   `json:"is_shared"`
+		} `json:"runner"`
+		ArtifactsFile struct {
+			Filename string `json:"filename"`
+			Size     int    `json:"size"`
+		} `json:"artifacts_file"`
+	}
+
+	c, err := dummyController()
+	if err != nil {
+		t.Fatalf("error creating dummy controller: %v", err)
+	}
+
+	// Set the event to have a different branch
+	event := gitlab.PipelineEvent{}
+
+	// Set up some unsuccessful builds
+	event.Builds = append(event.Builds, Build{
+		Status: "success",
+	})
+	event.Builds = append(event.Builds, Build{
+		Status: "failure",
+	})
+
+	msg := WebHook{
+		Event: event,
+	}
+
+	err = c.handle(msg)
+	if err != nil {
+		t.Fatalf("error handling WebHook message: %v", err)
+	}
+
+	client, ok := c.client.(*MockDockerClient)
+	if !ok {
+		t.Fatalf("error casting docker client to concrete type")
+	}
+
+	// The build should not have run as one of the builds was not successful
+	if len(client.instructions) != 0 {
+		t.Fatalf("client should have not run deployment, found %d instructions", len(client.instructions))
+	}
+}
