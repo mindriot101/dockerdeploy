@@ -9,7 +9,7 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
-	"github.com/mindriot101/dockerdeploy/internal/config"
+	"github.com/mindriot101/dockerdeploy/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/xanzy/go-gitlab"
 )

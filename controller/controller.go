@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -13,7 +14,7 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
 	"github.com/gin-gonic/gin"
-	"github.com/mindriot101/dockerdeploy/internal/config"
+	"github.com/mindriot101/dockerdeploy/config"
 	"github.com/xanzy/go-gitlab"
 )
 
@@ -208,8 +209,7 @@ func (c *Controller) webhook(w WebHook) error {
 func (c *Controller) refreshImage(t Trigger) error {
 	// Implementation is to pull the previous image, then remove the current
 	// image and run the new image in its place
-	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Second)
-	defer cancel()
+	ctx := context.Background()
 
 	ref := fmt.Sprintf("%s:%s", t.ImageName, t.ImageTag)
 	log.Printf("refreshing image %s", ref)
@@ -219,7 +219,9 @@ func (c *Controller) refreshImage(t Trigger) error {
 		return err
 	}
 	defer rc.Close()
+	io.Copy(os.Stderr, rc)
 
+	log.Println("removing container %s if exists", t.ContainerName)
 	// Remove the currently running container
 	err = c.client.ContainerRemove(ctx, t.ContainerName, types.ContainerRemoveOptions{
 		Force: true,
@@ -259,6 +261,12 @@ func (c *Controller) refreshImage(t Trigger) error {
 		t.ContainerName,
 	)
 	if err != nil {
+		log.Printf("error creating container: %v", err)
+		return err
+	}
+
+	if err := c.client.ContainerStart(ctx, created.ID, types.ContainerStartOptions{}); err != nil {
+		log.Printf("error starting container: %v", err)
 		return err
 	}
 
@@ -277,4 +285,5 @@ type DockerClient interface {
 	ContainerRemove(ctx context.Context, containerID string, options types.ContainerRemoveOptions) error
 	ContainerCreate(ctx context.Context, config *container.Config, hostConfig *container.HostConfig,
 		networkingConfig *network.NetworkingConfig, containerName string) (container.ContainerCreateCreatedBody, error)
+	ContainerStart(ctx context.Context, containerID string, opts types.ContainerStartOptions) error
 }
