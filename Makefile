@@ -7,3 +7,7 @@ build:
 .PHONY: clean
 clean:
 	rm -f ${BINARY}
+
+.PHONY: test
+test:
+	go test ./...
