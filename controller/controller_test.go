@@ -73,6 +73,10 @@ func (d *MockDockerClient) ContainerStart(ctx context.Context, containerID strin
 	return nil
 }
 
+func (d *MockDockerClient) ContainerInspect(ctx context.Context, containerID string) (types.ContainerJSON, error) {
+	return types.ContainerJSON{}, nil
+}
+
 func TestHandleWebhookRequest(t *testing.T) {
 	c, err := dummyController()
 	if err != nil {
