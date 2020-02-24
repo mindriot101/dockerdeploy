@@ -11,6 +11,7 @@ require (
 	github.com/docker/go-units v0.4.0 // indirect
 	github.com/gin-gonic/gin v1.5.0
 	github.com/gogo/protobuf v1.3.1 // indirect
+	github.com/google/go-cmp v0.4.0
 	github.com/gorilla/mux v1.7.4 // indirect
 	github.com/morikuni/aec v1.0.0 // indirect
 	github.com/opencontainers/go-digest v1.0.0-rc1 // indirect
@@ -24,5 +25,6 @@ require (
 	google.golang.org/appengine v1.6.5 // indirect
 	google.golang.org/grpc v1.27.1 // indirect
 	gopkg.in/yaml.v2 v2.2.8
+	gotest.tools v2.2.0+incompatible
 	gotest.tools/v3 v3.0.2 // indirect
 )
