@@ -125,7 +125,7 @@ func (c *Controller) Listen() {
 	}()
 }
 
-func (c Controller) handle(msg MessageType) error {
+func (c *Controller) handle(msg MessageType) error {
 	switch msg.(type) {
 	case Poll:
 		m, _ := msg.(Poll)
@@ -142,6 +142,11 @@ func (c Controller) handle(msg MessageType) error {
 }
 
 func (c *Controller) poll(p Poll) error {
+	// Check on the current container. If it is not running, restart it
+	// Outline:
+	// - get the container by name
+	// - if it exists: continue
+	// - if it doesn't exist, start the container
 	return nil
 }
 
@@ -201,9 +206,13 @@ func (c *Controller) refreshImage(t Trigger) error {
 	}
 	hostConfig := container.HostConfig{
 		// TODO
+		RestartPolicy: container.RestartPolicy{
+			Name: "always",
+		},
+		// TODO
 		PortBindings: nil,
 		// TODO
-		AutoRemove: true,
+		AutoRemove: false,
 		// TODO
 		Mounts: nil,
 	}
@@ -224,6 +233,16 @@ func (c *Controller) refreshImage(t Trigger) error {
 	if err := c.client.ContainerStart(ctx, created.ID, types.ContainerStartOptions{}); err != nil {
 		log.Printf("error starting container: %v", err)
 		return err
+	}
+
+	log.Printf("waiting for container %s", created.ID)
+	statusCh, errCh := c.client.ContainerWait(ctx, created.ID, container.WaitConditionNotRunning)
+	select {
+	case err := <-errCh:
+		if err != nil {
+			return err
+		}
+	case <-statusCh:
 	}
 
 	// Inspect the `created` object to get information about the container creation process

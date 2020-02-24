@@ -15,4 +15,5 @@ type DockerClient interface {
 	ContainerCreate(ctx context.Context, config *container.Config, hostConfig *container.HostConfig,
 		networkingConfig *network.NetworkingConfig, containerName string) (container.ContainerCreateCreatedBody, error)
 	ContainerStart(ctx context.Context, containerID string, opts types.ContainerStartOptions) error
+	ContainerWait(ctx context.Context, containerID string, wc container.WaitCondition) (<-chan container.ContainerWaitOKBody, <-chan error)
 }
