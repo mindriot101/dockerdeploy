@@ -8,6 +8,7 @@ container:
   mounts:
     - host: $PWD/data
       target: /data
+  name: foobar
 branch:
   name: master
   build_on_failure: false

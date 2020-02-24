@@ -147,6 +147,26 @@ func (c *Controller) poll(p Poll) error {
 	// - get the container by name
 	// - if it exists: continue
 	// - if it doesn't exist, start the container
+
+	ctx := context.Background()
+
+	_, err := c.client.ContainerInspect(ctx, c.cfg.Container.Name)
+	if err != nil {
+		if client.IsErrNotFound(err) {
+			log.Printf("cannot find running container with name %s, restarting", c.cfg.Container.Name)
+			trigger := Trigger{
+				ImageName:     c.cfg.Image.Name,
+				ImageTag:      c.cfg.Image.Tag,
+				ContainerName: c.cfg.Container.Name,
+			}
+			return c.refreshImage(trigger)
+
+		} else {
+			log.Printf("unknown error occurred: %v", err)
+			return err
+		}
+
+	}
 	return nil
 }
 
@@ -233,16 +253,6 @@ func (c *Controller) refreshImage(t Trigger) error {
 	if err := c.client.ContainerStart(ctx, created.ID, types.ContainerStartOptions{}); err != nil {
 		log.Printf("error starting container: %v", err)
 		return err
-	}
-
-	log.Printf("waiting for container %s", created.ID)
-	statusCh, errCh := c.client.ContainerWait(ctx, created.ID, container.WaitConditionNotRunning)
-	select {
-	case err := <-errCh:
-		if err != nil {
-			return err
-		}
-	case <-statusCh:
 	}
 
 	// Inspect the `created` object to get information about the container creation process
