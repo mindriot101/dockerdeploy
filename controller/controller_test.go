@@ -4,13 +4,13 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 	"testing"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
 	"github.com/mindriot101/dockerdeploy/config"
-	"github.com/stretchr/testify/assert"
 	"github.com/xanzy/go-gitlab"
 )
 
@@ -25,10 +25,14 @@ func dummyController() (*Controller, error) {
 
 func TestHandlePollInstruction(t *testing.T) {
 	c, err := dummyController()
-	assert.Nil(t, err)
+	if err != nil {
+		t.Fatalf("error creating controller: %v", err)
+	}
 
 	err = c.handle(Poll{})
-	assert.Nil(t, err)
+	if err != nil {
+		t.Fatalf("error handling poll instruction: %v", err)
+	}
 }
 
 type MockDockerClient struct {
@@ -38,9 +42,19 @@ type MockDockerClient struct {
 func (d *MockDockerClient) pushInstruction(msg string) {
 }
 
+type MockPullResponse struct{}
+
+func (m *MockPullResponse) Read(p []byte) (int, error) {
+	return 0, io.EOF
+}
+
+func (m *MockPullResponse) Close() error {
+	return nil
+}
+
 func (d *MockDockerClient) ImagePull(ctx context.Context, ref string, options types.ImagePullOptions) (io.ReadCloser, error) {
 	d.instructions = append(d.instructions, fmt.Sprintf("pulling image %s with options %v", ref, options))
-	return nil, nil
+	return &MockPullResponse{}, nil
 }
 
 func (d *MockDockerClient) ContainerRemove(ctx context.Context, containerID string, options types.ContainerRemoveOptions) error {
@@ -54,21 +68,49 @@ func (d *MockDockerClient) ContainerCreate(ctx context.Context, config *containe
 	return body, nil
 }
 
+func (d *MockDockerClient) ContainerStart(ctx context.Context, containerID string, opts types.ContainerStartOptions) error {
+	d.instructions = append(d.instructions, fmt.Sprintf("starting container %s", containerID))
+	return nil
+}
+
 func TestHandleWebhookRequest(t *testing.T) {
 	c, err := dummyController()
-	assert.Nil(t, err)
+	if err != nil {
+		t.Fatalf("error creating dummy controller: %v", err)
+	}
+
 	event := gitlab.PipelineEvent{}
 	msg := WebHook{
 		Event: event,
 	}
 
 	err = c.handle(msg)
+	if err != nil {
+		t.Fatalf("error handling WebHook message: %v", err)
+	}
 
-	assert.Nil(t, err)
 	client, ok := c.client.(*MockDockerClient)
-	assert.True(t, ok)
-	assert.Len(t, client.instructions, 3)
-	assert.Contains(t, client.instructions[0], "pulling image")
-	assert.Contains(t, client.instructions[1], "removing container")
-	assert.Contains(t, client.instructions[2], "creating container")
+	if !ok {
+		t.Fatalf("error casting docker client to concrete type")
+	}
+
+	if len(client.instructions) != 4 {
+		t.Fatalf("expected 4 instructions, found %d", len(client.instructions))
+	}
+
+	if !strings.Contains(client.instructions[0], "pulling image") {
+		t.Fatalf("first instruction should be pulling the new image")
+	}
+
+	if !strings.Contains(client.instructions[1], "removing container") {
+		t.Fatalf("second instruction should be removing the old container")
+	}
+
+	if !strings.Contains(client.instructions[2], "creating container") {
+		t.Fatalf("third instruction should be creating the new container")
+	}
+
+	if !strings.Contains(client.instructions[3], "starting container") {
+		t.Fatalf("fourth instruction should be starting the new container")
+	}
 }

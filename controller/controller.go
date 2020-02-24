@@ -221,7 +221,7 @@ func (c *Controller) refreshImage(t Trigger) error {
 	defer rc.Close()
 	io.Copy(os.Stderr, rc)
 
-	log.Println("removing container %s if exists", t.ContainerName)
+	log.Printf("removing container %s if exists", t.ContainerName)
 	// Remove the currently running container
 	err = c.client.ContainerRemove(ctx, t.ContainerName, types.ContainerRemoveOptions{
 		Force: true,
