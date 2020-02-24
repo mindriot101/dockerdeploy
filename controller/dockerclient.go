@@ -9,6 +9,7 @@ import (
 	"github.com/docker/docker/api/types/network"
 )
 
+// Interface that defines the API surface of the Docker interactions
 type DockerClient interface {
 	ImagePull(ctx context.Context, ref string, options types.ImagePullOptions) (io.ReadCloser, error)
 	ContainerRemove(ctx context.Context, containerID string, options types.ContainerRemoveOptions) error

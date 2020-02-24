@@ -1,3 +1,4 @@
+// Manage docker containers and trigger refreshes on command
 package main
 
 import (
