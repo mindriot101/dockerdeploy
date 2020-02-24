@@ -212,4 +212,18 @@ func TestNonSuccessfulBuild(t *testing.T) {
 	if len(client.instructions) != 0 {
 		t.Fatalf("client should have not run deployment, found %d instructions", len(client.instructions))
 	}
+
+	// Update the config to allow build on success
+	c.cfg.Branch.BuildOnFailure = true
+
+	err = c.handle(msg)
+	if err != nil {
+		t.Fatalf("error handling WebHook message: %v", err)
+	}
+
+	// This time the build should occur because we have enabled BuildOnFailure
+	if len(client.instructions) == 0 {
+		t.Fatalf("client should have not run deployment, found %d instructions", len(client.instructions))
+	}
+
 }
