@@ -4,15 +4,13 @@ image:
   tag: 3.7
 container:
   ports:
-    - host: 5020
-      target: 80
+  - host: 5020
+    target: 80
   mounts:
-    - host: $PWD/data
-      target: /data
+  - host: $PWD/data
+    target: /data
   name: foobar
-  command:
-    - sleep
-    - 86400
+  command: ["python", "-m", "http.server", "80"]
 branch:
   name: master
   build_on_failure: false

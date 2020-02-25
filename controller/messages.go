@@ -19,6 +19,7 @@ func (p Poll) Validate() error {
 }
 
 type Trigger struct {
+	Command       []string       `json:"command"`
 	ImageName     string         `json:"image_name"`
 	ImageTag      string         `json:"image_tag"`
 	ContainerName string         `json:"container_name"`

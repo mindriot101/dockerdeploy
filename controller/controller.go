@@ -196,6 +196,7 @@ func (c *Controller) webhook(w WebHook) error {
 
 func (c *Controller) createTrigger() Trigger {
 	return Trigger{
+		Command:       c.cfg.Container.Command,
 		ImageName:     c.cfg.Image.Name,
 		ImageTag:      c.cfg.Image.Tag,
 		ContainerName: c.cfg.Container.Name,

@@ -42,7 +42,7 @@ func RunContainer(ctx context.Context, client DockerClient, t Trigger, opts RunC
 
 	log.Printf("starting container %s with image %s", t.ContainerName, opts.Name)
 	containerConfig := container.Config{
-		Cmd:          []string{"sleep", "86400"},
+		Cmd:          t.Command,
 		Image:        opts.Name,
 		ExposedPorts: exposedPorts,
 	}
