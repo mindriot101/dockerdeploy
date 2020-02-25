@@ -2,7 +2,7 @@ NOW := $(shell date +'%Y-%m-%dT%T')
 BINARY := dockerdeploy
 
 build:
-	go build -o ${BINARY} -ldflags "-X main.sha1ver=$(shell git rev-parse HEAD) -X main.buildTime=${NOW}" main.go
+	go build -o ${BINARY} -ldflags "-X main.commit=$(shell git rev-parse HEAD) -X main.date=${NOW}" main.go
 
 .PHONY: clean
 clean:
