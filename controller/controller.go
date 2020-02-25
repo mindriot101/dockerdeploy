@@ -66,27 +66,7 @@ func NewController(opts NewControllerOptions) (*Controller, error) {
 
 // HandleTrigger handles trigger web requests
 func (c *Controller) HandleTrigger(ctx *gin.Context) {
-	var t Trigger
-
-	if err := ctx.ShouldBind(&t); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{
-			"status":     "error",
-			"error":      err.Error(),
-			"error_type": "decoding",
-		})
-		return
-	}
-
-	if err := t.Validate(); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{
-			"status":     "error",
-			"error":      err.Error(),
-			"error_type": "validation",
-		})
-		return
-	}
-
-	c.inbox <- t
+	c.inbox <- c.createTrigger()
 
 	ctx.JSON(200, gin.H{
 		"status": "ok",
@@ -215,6 +195,8 @@ func (c *Controller) createTrigger() Trigger {
 		ImageName:     c.cfg.Image.Name,
 		ImageTag:      c.cfg.Image.Tag,
 		ContainerName: c.cfg.Container.Name,
+		Mounts:        c.cfg.Container.Mounts,
+		Ports:         c.cfg.Container.Ports,
 	}
 }
 
