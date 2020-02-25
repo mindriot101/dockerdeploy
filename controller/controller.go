@@ -18,17 +18,21 @@ import (
 	"github.com/xanzy/go-gitlab"
 )
 
+// Controller that reconciles and manages containers
 type Controller struct {
 	inbox  chan MessageType
 	client DockerClient
 	cfg    *config.Config
+	cancel chan interface{}
 }
 
+// NewControllerOptions specifies options for creating new controllers
 type NewControllerOptions struct {
 	Cfg    *config.Config
 	Client DockerClient
 }
 
+// NewController creates a new controller from arguments
 func NewController(opts NewControllerOptions) (*Controller, error) {
 	// Validate options
 	if opts.Cfg == nil {
@@ -62,7 +66,7 @@ func NewController(opts NewControllerOptions) (*Controller, error) {
 	}, nil
 }
 
-// Web route handlers
+// HandleTrigger handles trigger web requests
 func (c *Controller) HandleTrigger(ctx *gin.Context) {
 	var t Trigger
 
