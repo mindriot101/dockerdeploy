@@ -10,6 +10,9 @@ container:
     - host: $PWD/data
       target: /data
   name: foobar
+  command:
+    - sleep
+    - 86400
 branch:
   name: master
   build_on_failure: false
