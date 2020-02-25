@@ -17,26 +17,31 @@ type RunContainerOptions struct {
 }
 
 func RunContainer(ctx context.Context, client DockerClient, t Trigger, opts RunContainerOptions) (*container.ContainerCreateCreatedBody, error) {
-
-	log.Printf("starting container %s with image %s", t.ContainerName, opts.Name)
-	containerConfig := container.Config{
-		Cmd:   []string{"sleep", "86400"},
-		Image: opts.Name,
-	}
-
+	// Set up the initial data that the requests need
 	// Include port bindings
 	ports := make(nat.PortMap)
+	exposedPorts := make(nat.PortSet)
 	for _, portDef := range t.Ports {
 		// TODO: support udp ports?
 
 		// Host or target?
 		port := fmt.Sprintf("%d/tcp", portDef.Target)
 		portBinding := nat.PortBinding{
+			HostIP:   "127.0.0.1",
 			HostPort: fmt.Sprintf("%d", portDef.Host),
 		}
 		ports[nat.Port(port)] = []nat.PortBinding{
 			portBinding,
 		}
+
+		exposedPorts[nat.Port(port)] = struct{}{}
+	}
+
+	log.Printf("starting container %s with image %s", t.ContainerName, opts.Name)
+	containerConfig := container.Config{
+		Cmd:          []string{"sleep", "86400"},
+		Image:        opts.Name,
+		ExposedPorts: exposedPorts,
 	}
 
 	hostConfig := container.HostConfig{
