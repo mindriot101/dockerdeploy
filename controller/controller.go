@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/docker/docker/api/types"
@@ -14,20 +15,26 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/mindriot101/dockerdeploy/config"
 	"github.com/xanzy/go-gitlab"
+	"gopkg.in/fsnotify.v1"
 )
 
 // Controller that reconciles and manages containers
 type Controller struct {
-	inbox  chan MessageType
-	client DockerClient
-	cfg    *config.Config
-	cancel chan interface{}
+	inbox   chan MessageType
+	client  DockerClient
+	cfg     *config.Config
+	cancel  chan interface{}
+	watcher *fsnotify.Watcher
+
+	// Mutex to prevent data races for the config object
+	mu sync.Mutex
 }
 
 // NewControllerOptions specifies options for creating new controllers
 type NewControllerOptions struct {
-	Cfg    *config.Config
-	Client DockerClient
+	Cfg        *config.Config
+	Client     DockerClient
+	ConfigFile string
 }
 
 // NewController creates a new controller from arguments
@@ -36,7 +43,6 @@ func NewController(opts NewControllerOptions) (*Controller, error) {
 	if opts.Cfg == nil {
 		return nil, fmt.Errorf("config argument not valid")
 	}
-
 	inbox := make(chan MessageType)
 	cancel := make(chan interface{})
 
@@ -60,12 +66,48 @@ func NewController(opts NewControllerOptions) (*Controller, error) {
 		}
 	}()
 
-	return &Controller{
-		inbox:  inbox,
-		cfg:    opts.Cfg,
-		client: opts.Client,
-		cancel: cancel,
-	}, nil
+	// Set up the file watcher
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		log.Println("error setting up file watcher")
+		return nil, err
+	}
+
+	controller := &Controller{
+		inbox:   inbox,
+		cfg:     opts.Cfg,
+		client:  opts.Client,
+		cancel:  cancel,
+		watcher: watcher,
+	}
+
+	// Watch config file
+	go func(c *Controller, filename string) {
+		log.Println("setting up config file watcher")
+		for {
+			select {
+			case event := <-watcher.Events:
+				log.Println("config file changed:", event)
+				cfg, err := config.Parse(filename)
+				if err != nil {
+					log.Println("error reading config file:", err)
+				}
+				c.mu.Lock()
+				c.cfg = cfg
+				c.mu.Unlock()
+			case err := <-watcher.Errors:
+				log.Println("error watching config file:", err)
+			}
+		}
+	}(controller, opts.ConfigFile)
+
+	err = watcher.Add(opts.ConfigFile)
+	if err != nil {
+		log.Println("error adding config file to watcher")
+		return nil, err
+	}
+
+	return controller, nil
 }
 
 // HandleTrigger handles trigger web requests
@@ -125,6 +167,9 @@ func (c *Controller) StopPolling() {
 }
 
 func (c *Controller) handle(msg MessageType) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	switch msg.(type) {
 	case Poll:
 		m, _ := msg.(Poll)
@@ -141,6 +186,7 @@ func (c *Controller) handle(msg MessageType) error {
 }
 
 func (c *Controller) Close() error {
+	c.watcher.Close()
 	c.StopPolling()
 	return nil
 }
