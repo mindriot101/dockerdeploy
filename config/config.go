@@ -24,9 +24,10 @@ type Image struct {
 
 // Configuration for the container to run
 type Container struct {
-	Ports  []Port  `yaml:"ports"`
-	Mounts []Mount `yaml:"mounts"`
-	Name   string  `yaml:"name"`
+	Ports   []Port   `yaml:"ports"`
+	Mounts  []Mount  `yaml:"mounts"`
+	Name    string   `yaml:"name"`
+	Command []string `yaml:"command"`
 }
 
 type Port struct {

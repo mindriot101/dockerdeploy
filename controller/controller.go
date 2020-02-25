@@ -10,8 +10,6 @@ import (
 	"time"
 
 	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
 	"github.com/gin-gonic/gin"
 	"github.com/mindriot101/dockerdeploy/config"
@@ -44,6 +42,10 @@ func NewController(opts NewControllerOptions) (*Controller, error) {
 
 	// Set up the polling loop
 	go func() {
+		// Spawn an initial poll message
+		// TODO: make this a configuration parameter?
+		inbox <- Poll{}
+
 		t := time.Tick(time.Duration(opts.Cfg.Heartbeat.SleepTime) * time.Second)
 
 		for {
@@ -68,27 +70,7 @@ func NewController(opts NewControllerOptions) (*Controller, error) {
 
 // HandleTrigger handles trigger web requests
 func (c *Controller) HandleTrigger(ctx *gin.Context) {
-	var t Trigger
-
-	if err := ctx.ShouldBind(&t); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{
-			"status":     "error",
-			"error":      err.Error(),
-			"error_type": "decoding",
-		})
-		return
-	}
-
-	if err := t.Validate(); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{
-			"status":     "error",
-			"error":      err.Error(),
-			"error_type": "validation",
-		})
-		return
-	}
-
-	c.inbox <- t
+	c.inbox <- c.createTrigger()
 
 	ctx.JSON(200, gin.H{
 		"status": "ok",
@@ -176,12 +158,7 @@ func (c *Controller) poll(p Poll) error {
 	if err != nil {
 		if client.IsErrNotFound(err) {
 			log.Printf("cannot find running container with name %s, restarting", c.cfg.Container.Name)
-			trigger := Trigger{
-				ImageName:     c.cfg.Image.Name,
-				ImageTag:      c.cfg.Image.Tag,
-				ContainerName: c.cfg.Container.Name,
-			}
-			return c.refreshImage(trigger)
+			return c.refreshImage(c.createTrigger())
 
 		} else {
 			log.Printf("unknown error occurred: %v", err)
@@ -214,13 +191,18 @@ func (c *Controller) webhook(w WebHook) error {
 		}
 	}
 
-	trigger := Trigger{
+	return c.refreshImage(c.createTrigger())
+}
+
+func (c *Controller) createTrigger() Trigger {
+	return Trigger{
+		Command:       c.cfg.Container.Command,
 		ImageName:     c.cfg.Image.Name,
 		ImageTag:      c.cfg.Image.Tag,
 		ContainerName: c.cfg.Container.Name,
+		Mounts:        c.cfg.Container.Mounts,
+		Ports:         c.cfg.Container.Ports,
 	}
-
-	return c.refreshImage(trigger)
 }
 
 func (c *Controller) refreshImage(t Trigger) error {
@@ -251,47 +233,15 @@ func (c *Controller) refreshImage(t Trigger) error {
 		}
 	}
 
-	log.Printf("starting container %s with image %s", t.ContainerName, ref)
-	containerConfig := container.Config{
-		Cmd:   []string{"sleep", "86400"},
-		Image: ref,
+	// Finally run the container
+	opts := RunContainerOptions{
+		Name: ref,
 	}
-	hostConfig := container.HostConfig{
-		// TODO
-		RestartPolicy: container.RestartPolicy{
-			Name: "always",
-		},
-		// TODO
-		PortBindings: nil,
-		// TODO
-		AutoRemove: false,
-		// TODO
-		Mounts: nil,
-	}
-	networkConfig := network.NetworkingConfig{}
-
-	created, err := c.client.ContainerCreate(
-		ctx,
-		&containerConfig,
-		&hostConfig,
-		&networkConfig,
-		t.ContainerName,
-	)
+	created, err := RunContainer(ctx, c.client, t, opts)
 	if err != nil {
-		log.Printf("error creating container: %v", err)
+		log.Printf("error running container: %v", err)
 		return err
 	}
-
-	if err := c.client.ContainerStart(ctx, created.ID, types.ContainerStartOptions{}); err != nil {
-		log.Printf("error starting container: %v", err)
-		return err
-	}
-
-	// Inspect the `created` object to get information about the container creation process
-	for _, warning := range created.Warnings {
-		log.Printf("WARNING: %s", warning)
-	}
-
 	log.Printf("created container with id %s", created.ID)
 
 	return nil

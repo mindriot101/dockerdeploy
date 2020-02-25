@@ -1,14 +1,16 @@
+api_version: "1"
 image:
-  name: ubuntu
-  tag: latest
+  name: python
+  tag: 3.7
 container:
   ports:
-    - host: 8080
-      target: 80
+  - host: 5020
+    target: 80
   mounts:
-    - host: $PWD/data
-      target: /data
+  - host: $PWD/data
+    target: /data
   name: foobar
+  command: ["python", "-m", "http.server", "80"]
 branch:
   name: master
   build_on_failure: false
