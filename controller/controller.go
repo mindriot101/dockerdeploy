@@ -36,13 +36,21 @@ func NewController(opts NewControllerOptions) (*Controller, error) {
 	}
 
 	inbox := make(chan MessageType)
+	cancel := make(chan interface{})
 
 	// Set up the polling loop
 	go func() {
+		t := time.Tick(time.Duration(opts.Cfg.Heartbeat.SleepTime) * time.Second)
+
 		for {
-			log.Println("sending poll message")
-			inbox <- Poll{}
-			time.Sleep(time.Duration(opts.Cfg.Heartbeat.SleepTime) * time.Second)
+			select {
+			case <-t:
+				log.Println("sending poll message")
+				inbox <- Poll{}
+			case <-cancel:
+				log.Println("cancelling polling loop")
+				break
+			}
 		}
 	}()
 
@@ -50,6 +58,7 @@ func NewController(opts NewControllerOptions) (*Controller, error) {
 		inbox:  inbox,
 		cfg:    opts.Cfg,
 		client: opts.Client,
+		cancel: cancel,
 	}, nil
 }
 
@@ -123,6 +132,10 @@ func (c *Controller) Listen() {
 			}
 		}
 	}()
+}
+
+func (c *Controller) StopPolling() {
+	c.cancel <- nil
 }
 
 func (c *Controller) handle(msg MessageType) error {
