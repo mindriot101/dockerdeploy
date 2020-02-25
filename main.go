@@ -55,6 +55,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer controller.Close()
 
 	// Create the web server
 	r := gin.Default()

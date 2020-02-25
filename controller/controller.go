@@ -154,6 +154,11 @@ func (c *Controller) handle(msg MessageType) error {
 	}
 }
 
+func (c *Controller) Close() error {
+	c.StopPolling()
+	return nil
+}
+
 func (c *Controller) poll(p Poll) error {
 	// Check on the current container. If it is not running, restart it
 	// Outline:
