@@ -13,8 +13,8 @@ import (
 )
 
 var (
-	sha1ver   string
-	buildTime string
+	commit string
+	date   string
 
 	// Used for flags
 	configFilename string
@@ -61,7 +61,7 @@ func main() {
 		Use:     "dockerdeploy",
 		Short:   "Deploy and manage docker containers",
 		Run:     run,
-		Version: fmt.Sprintf("Binary sha %s built on %s\n", sha1ver, buildTime),
+		Version: fmt.Sprintf("Binary sha %s built on %s\n", commit, date),
 	}
 
 	rootCmd.Flags().StringVarP(&configFilename, "config", "c", "", "FILENAME")
