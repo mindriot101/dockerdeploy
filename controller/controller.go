@@ -42,6 +42,10 @@ func NewController(opts NewControllerOptions) (*Controller, error) {
 
 	// Set up the polling loop
 	go func() {
+		// Spawn an initial poll message
+		// TODO: make this a configuration parameter?
+		inbox <- Poll{}
+
 		t := time.Tick(time.Duration(opts.Cfg.Heartbeat.SleepTime) * time.Second)
 
 		for {
