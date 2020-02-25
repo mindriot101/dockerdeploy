@@ -9,10 +9,11 @@ import (
 
 // Overall config object
 type Config struct {
-	Image     Image     `yaml:"image"`
-	Container Container `yaml:"container"`
-	Branch    Branch    `yaml:"branch"`
-	Heartbeat Heartbeat `yaml:"heartbeat"`
+	ApiVersion string    `yaml:"api_version"`
+	Image      Image     `yaml:"image"`
+	Container  Container `yaml:"container"`
+	Branch     Branch    `yaml:"branch"`
+	Heartbeat  Heartbeat `yaml:"heartbeat"`
 }
 
 // Configuration for the image
@@ -72,6 +73,10 @@ func Parse(filename string) (*Config, error) {
 // Validate the configuration value to make sure any required parameters are not missing
 func (c *Config) Validate() error {
 	// Errors
+	if c.ApiVersion == "" {
+		return fmt.Errorf("validation error: api version can not be empty")
+	}
+
 	if c.Container.Name == "" {
 		return fmt.Errorf("validation error: container name can not be empty")
 	}

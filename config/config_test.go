@@ -8,6 +8,7 @@ import (
 )
 
 var config = `
+api_version: "1"
 image:
   name: ubuntu
   tag: latest
@@ -84,6 +85,9 @@ func TestParseConfig(t *testing.T) {
 
 func TestValidation(t *testing.T) {
 	cfg, err := parseString([]byte(config))
+	if err != nil {
+		t.Fatalf("error parsing config: %v", err)
+	}
 
 	{
 		orig := cfg.Container.Name
@@ -130,6 +134,9 @@ func TestValidation(t *testing.T) {
 
 func TestSaneDefaults(t *testing.T) {
 	cfg, err := parseString([]byte(config))
+	if err != nil {
+		t.Fatalf("error parsing config: %v", err)
+	}
 
 	{
 		cfg.Image.Tag = ""
@@ -143,4 +150,24 @@ func TestSaneDefaults(t *testing.T) {
 		}
 	}
 
+}
+
+func TestApiVersionRequired(t *testing.T) {
+	cfg, err := parseString([]byte(config))
+	if err != nil {
+		t.Fatalf("error parsing config: %v", err)
+	}
+
+	{
+		orig := cfg.ApiVersion
+		cfg.ApiVersion = ""
+		err = cfg.Validate()
+		if err == nil {
+			t.Fatalf("validation should not pass with blank api_version key")
+		}
+		if !strings.Contains(err.Error(), "api version can not be empty") {
+			t.Fatalf("error validating empty api version")
+		}
+		cfg.ApiVersion = orig
+	}
 }
