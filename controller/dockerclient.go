@@ -5,9 +5,12 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"os"
+	"strings"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/go-connections/nat"
 )
@@ -44,15 +47,31 @@ func RunContainer(ctx context.Context, client DockerClient, t Trigger, opts RunC
 		ExposedPorts: exposedPorts,
 	}
 
+	// Configure mounts
+	cwd, err := os.Getwd()
+	if err != nil {
+		return nil, err
+	}
+
+	mounts := []mount.Mount{}
+	for _, m := range t.Mounts {
+		source := strings.Replace(m.Host, "$PWD", cwd, 1)
+		mount := mount.Mount{
+			Type:   "bind",
+			Source: source,
+			Target: m.Target,
+		}
+		_ = m
+		mounts = append(mounts, mount)
+	}
+
 	hostConfig := container.HostConfig{
 		RestartPolicy: container.RestartPolicy{
 			Name: "always",
 		},
-		// TODO
 		PortBindings: ports,
-		// TODO
-		Mounts:     nil,
-		AutoRemove: false,
+		Mounts:       mounts,
+		AutoRemove:   false,
 	}
 
 	log.Printf("host ports: %+v", hostConfig.PortBindings)

@@ -1,10 +1,10 @@
 api_version: "1"
 image:
-  name: ubuntu
-  tag: latest
+  name: python
+  tag: 3.7
 container:
   ports:
-    - host: 8080
+    - host: 5020
       target: 80
   mounts:
     - host: $PWD/data
