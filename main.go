@@ -37,8 +37,9 @@ func run(cmd *cobra.Command, args []string) {
 	}
 
 	controller, err := controller.NewController(controller.NewControllerOptions{
-		Cfg:    cfg,
-		Client: cli,
+		Cfg:        cfg,
+		Client:     cli,
+		ConfigFile: configFilename,
 	})
 	if err != nil {
 		log.Fatal(err)

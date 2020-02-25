@@ -1,7 +1,7 @@
 api_version: "1"
 image:
   name: python
-  tag: 3.7
+  tag: 3.6
 container:
   ports:
   - host: 5020
@@ -17,3 +17,4 @@ branch:
 heartbeat:
   sleep_time: 10
   endpoint: /heartbeat
+# Test
