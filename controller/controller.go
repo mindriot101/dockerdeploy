@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/docker/docker/api/types"
@@ -236,7 +236,9 @@ func (c *Controller) refreshImage(t Trigger) error {
 		return err
 	}
 	defer rc.Close()
-	io.Copy(os.Stderr, rc)
+
+	// Drain the ReadCloser. When this completes then the image pull is complete
+	io.Copy(ioutil.Discard, rc)
 
 	log.Printf("removing container %s if exists", t.ContainerName)
 	// Remove the currently running container
