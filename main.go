@@ -2,38 +2,26 @@
 package main
 
 import (
-	"flag"
+	"fmt"
 	"log"
 
 	"github.com/docker/docker/client"
 	"github.com/gin-gonic/gin"
 	"github.com/mindriot101/dockerdeploy/config"
 	"github.com/mindriot101/dockerdeploy/controller"
+	"github.com/spf13/cobra"
 )
 
 var (
 	sha1ver   string
 	buildTime string
+
+	// Used for flags
+	configFilename string
 )
 
-func main() {
-	// Set up command line arguments
-	version := flag.Bool("version", false, "Print the program version")
-	configFilename := flag.String("config", "", "Config filename")
-
-	flag.Parse()
-
-	if *version {
-		log.Printf("Binary sha %s built on %s\n", sha1ver, buildTime)
-		return
-	}
-
-	// Validate the arguments
-	if *configFilename == "" {
-		log.Fatalf("config file argument `-config` not passed")
-	}
-
-	cfg, err := config.Parse(*configFilename)
+func run(cmd *cobra.Command, args []string) {
+	cfg, err := config.Parse(configFilename)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -65,4 +53,22 @@ func main() {
 	controller.Listen()
 
 	log.Fatal(r.Run())
+}
+
+func main() {
+	// Set up command line arguments
+	rootCmd := &cobra.Command{
+		Use:     "dockerdeploy",
+		Short:   "Deploy and manage docker containers",
+		Run:     run,
+		Version: fmt.Sprintf("Binary sha %s built on %s\n", sha1ver, buildTime),
+	}
+
+	rootCmd.Flags().StringVarP(&configFilename, "config", "c", "", "FILENAME")
+	rootCmd.MarkFlagRequired("config")
+	err := rootCmd.Execute()
+	if err != nil {
+		log.Fatal(err)
+	}
+
 }
