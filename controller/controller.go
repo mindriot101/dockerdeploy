@@ -176,12 +176,7 @@ func (c *Controller) poll(p Poll) error {
 	if err != nil {
 		if client.IsErrNotFound(err) {
 			log.Printf("cannot find running container with name %s, restarting", c.cfg.Container.Name)
-			trigger := Trigger{
-				ImageName:     c.cfg.Image.Name,
-				ImageTag:      c.cfg.Image.Tag,
-				ContainerName: c.cfg.Container.Name,
-			}
-			return c.refreshImage(trigger)
+			return c.refreshImage(c.createTrigger())
 
 		} else {
 			log.Printf("unknown error occurred: %v", err)
@@ -214,13 +209,15 @@ func (c *Controller) webhook(w WebHook) error {
 		}
 	}
 
-	trigger := Trigger{
+	return c.refreshImage(c.createTrigger())
+}
+
+func (c *Controller) createTrigger() Trigger {
+	return Trigger{
 		ImageName:     c.cfg.Image.Name,
 		ImageTag:      c.cfg.Image.Tag,
 		ContainerName: c.cfg.Container.Name,
 	}
-
-	return c.refreshImage(trigger)
 }
 
 func (c *Controller) refreshImage(t Trigger) error {
