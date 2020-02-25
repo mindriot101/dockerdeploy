@@ -10,8 +10,6 @@ import (
 	"time"
 
 	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
 	"github.com/gin-gonic/gin"
 	"github.com/mindriot101/dockerdeploy/config"
@@ -246,47 +244,15 @@ func (c *Controller) refreshImage(t Trigger) error {
 		}
 	}
 
-	log.Printf("starting container %s with image %s", t.ContainerName, ref)
-	containerConfig := container.Config{
-		Cmd:   []string{"sleep", "86400"},
-		Image: ref,
+	// Finally run the container
+	opts := RunContainerOptions{
+		Name: ref,
 	}
-	hostConfig := container.HostConfig{
-		// TODO
-		RestartPolicy: container.RestartPolicy{
-			Name: "always",
-		},
-		// TODO
-		PortBindings: nil,
-		// TODO
-		AutoRemove: false,
-		// TODO
-		Mounts: nil,
-	}
-	networkConfig := network.NetworkingConfig{}
-
-	created, err := c.client.ContainerCreate(
-		ctx,
-		&containerConfig,
-		&hostConfig,
-		&networkConfig,
-		t.ContainerName,
-	)
+	created, err := RunContainer(ctx, c.client, t, opts)
 	if err != nil {
-		log.Printf("error creating container: %v", err)
+		log.Printf("error running container: %v", err)
 		return err
 	}
-
-	if err := c.client.ContainerStart(ctx, created.ID, types.ContainerStartOptions{}); err != nil {
-		log.Printf("error starting container: %v", err)
-		return err
-	}
-
-	// Inspect the `created` object to get information about the container creation process
-	for _, warning := range created.Warnings {
-		log.Printf("WARNING: %s", warning)
-	}
-
 	log.Printf("created container with id %s", created.ID)
 
 	return nil

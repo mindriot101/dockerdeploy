@@ -3,6 +3,7 @@ package controller
 import (
 	"fmt"
 
+	"github.com/mindriot101/dockerdeploy/config"
 	"github.com/xanzy/go-gitlab"
 )
 
@@ -18,9 +19,11 @@ func (p Poll) Validate() error {
 }
 
 type Trigger struct {
-	ImageName     string `json:"image_name"`
-	ImageTag      string `json:"image_tag"`
-	ContainerName string `json:"container_name"`
+	ImageName     string         `json:"image_name"`
+	ImageTag      string         `json:"image_tag"`
+	ContainerName string         `json:"container_name"`
+	Ports         []config.Port  `json:"ports"`
+	Mounts        []config.Mount `json:"mounts"`
 }
 
 func (p Trigger) Validate() error {
