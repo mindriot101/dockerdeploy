@@ -1,3 +1,4 @@
+api_version: "1"
 image:
   name: ubuntu
   tag: latest
