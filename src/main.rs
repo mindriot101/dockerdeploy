@@ -1,7 +1,17 @@
+use serde::Deserialize;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver};
 use warp::Filter;
 
-type Message = ();
+#[derive(Debug, Clone, Deserialize)]
+struct Message {
+    name: String,
+}
+
+// enum Message {
+// Trigger,
+// Webhook,
+// Poll,
+// }
 
 struct Controller {
     rx: UnboundedReceiver<Message>,
@@ -22,7 +32,7 @@ mod routes {
     use warp::Filter;
 
     pub(crate) fn build(
-        tx: UnboundedSender<()>,
+        tx: UnboundedSender<Message>,
     ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
         trigger(tx.clone()).or(webhook(tx.clone()))
     }
@@ -33,6 +43,7 @@ mod routes {
     ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
         warp::path!("trigger")
             .and(warp::post())
+            .and(json_body())
             .and(with_inbox(tx))
             .and_then(handlers::handle_trigger)
     }
@@ -43,6 +54,7 @@ mod routes {
     ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
         warp::path!("webhook")
             .and(warp::post())
+            .and(json_body())
             .and(with_inbox(tx))
             .and_then(handlers::handle_webhook)
     }
@@ -53,6 +65,12 @@ mod routes {
     {
         warp::any().map(move || tx.clone())
     }
+
+    fn json_body() -> impl Filter<Extract = (Message,), Error = warp::Rejection> + Clone {
+        // When accepting a body, we want a JSON body
+        // (and to reject huge payloads)...
+        warp::body::json()
+    }
 }
 
 mod handlers {
@@ -62,14 +80,18 @@ mod handlers {
     use warp::http::StatusCode;
 
     pub(crate) async fn handle_trigger(
+        msg: Message,
         _tx: UnboundedSender<Message>,
     ) -> Result<impl warp::Reply, Infallible> {
+        eprintln!("message: {:?}", msg);
         Ok(StatusCode::NO_CONTENT)
     }
 
     pub(crate) async fn handle_webhook(
+        msg: Message,
         _tx: UnboundedSender<Message>,
     ) -> Result<impl warp::Reply, Infallible> {
+        eprintln!("message: {:?}", msg);
         Ok(StatusCode::NO_CONTENT)
     }
 }
