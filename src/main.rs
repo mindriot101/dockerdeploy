@@ -1,7 +1,12 @@
 use anyhow::Result;
+use bollard::Docker;
 use serde::Deserialize;
+use tokio::stream::StreamExt;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver};
 use warp::Filter;
+
+static IMAGE_NAME: &'static str = "ubuntu";
+static CONTAINER_NAME: &'static str = "foobar";
 
 #[derive(Debug, Clone, Deserialize)]
 enum Message {
@@ -10,6 +15,7 @@ enum Message {
 
 struct Controller {
     rx: UnboundedReceiver<Message>,
+    docker: Docker,
 }
 
 impl Controller {
@@ -32,17 +38,72 @@ impl Controller {
     }
 
     async fn pull_image(&mut self) -> Result<()> {
+        use bollard::image::CreateImageOptions;
+
         log::info!("pulling image");
+
+        let options = Some(CreateImageOptions {
+            from_image: IMAGE_NAME,
+            tag: "latest",
+            ..Default::default()
+        });
+
+        let mut out_stream = self.docker.create_image(options, None, None);
+        while let Some(msg) = out_stream.next().await {
+            log::debug!("{:?}", msg);
+        }
         Ok(())
     }
 
     async fn stop_running_contianer(&mut self) -> Result<()> {
+        use bollard::container::RemoveContainerOptions;
+
         log::info!("stopping running container");
+
+        let options = Some(RemoveContainerOptions {
+            force: true,
+            ..Default::default()
+        });
+
+        match self.docker.remove_container(CONTAINER_NAME, options).await {
+            Ok(_) => {}
+            Err(e) => match e.kind() {
+                bollard::errors::ErrorKind::DockerResponseNotFoundError { .. } => {
+                    log::debug!("running container not found")
+                }
+                _ => return Err(e.into()),
+            },
+        }
+
         Ok(())
     }
 
     async fn run_container(&mut self) -> Result<()> {
+        use bollard::container::{Config, CreateContainerOptions, StartContainerOptions};
+
         log::info!("running new container");
+
+        let options = Some(CreateContainerOptions {
+            name: CONTAINER_NAME,
+            ..Default::default()
+        });
+
+        let config = Config {
+            image: Some(IMAGE_NAME),
+            cmd: Some(vec!["sleep", "86400"]),
+            ..Default::default()
+        };
+
+        let res = self.docker.create_container(options, config).await?;
+        for warning in res.warnings.unwrap_or(Vec::new()) {
+            log::warn!("container create warning: {}", warning);
+        }
+
+        // Start the new container
+        self.docker
+            .start_container(&res.id, None::<StartContainerOptions<String>>)
+            .await?;
+
         Ok(())
     }
 }
@@ -119,7 +180,9 @@ async fn main() {
 
     let (tx, rx) = unbounded_channel();
 
-    let mut controller = Controller { rx };
+    let docker = Docker::connect_with_local_defaults().expect("connecting to docker");
+
+    let mut controller = Controller { rx, docker };
 
     tokio::spawn(async move {
         controller.event_loop().await;
