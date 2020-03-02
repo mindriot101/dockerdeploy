@@ -3,15 +3,11 @@ use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver};
 use warp::Filter;
 
 #[derive(Debug, Clone, Deserialize)]
-struct Message {
-    name: String,
+enum Message {
+    Trigger,
+    Webhook,
+    Poll,
 }
-
-// enum Message {
-// Trigger,
-// Webhook,
-// Poll,
-// }
 
 struct Controller {
     rx: UnboundedReceiver<Message>,
@@ -43,7 +39,6 @@ mod routes {
     ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
         warp::path!("trigger")
             .and(warp::post())
-            .and(json_body())
             .and(with_inbox(tx))
             .and_then(handlers::handle_trigger)
     }
@@ -67,8 +62,6 @@ mod routes {
     }
 
     fn json_body() -> impl Filter<Extract = (Message,), Error = warp::Rejection> + Clone {
-        // When accepting a body, we want a JSON body
-        // (and to reject huge payloads)...
         warp::body::json()
     }
 }
@@ -80,10 +73,10 @@ mod handlers {
     use warp::http::StatusCode;
 
     pub(crate) async fn handle_trigger(
-        msg: Message,
-        _tx: UnboundedSender<Message>,
+        tx: UnboundedSender<Message>,
     ) -> Result<impl warp::Reply, Infallible> {
-        eprintln!("message: {:?}", msg);
+        tx.send(Message::Trigger).unwrap();
+
         Ok(StatusCode::NO_CONTENT)
     }
 
@@ -108,12 +101,6 @@ async fn main() {
 
     let api = routes::build(tx);
     let routes = api.with(warp::log("dockerdeploy"));
-
-    //     let hello = warp::path!("hello" / String).map(|name| async move {
-    //         tx.send(()).await.unwrap();
-
-    //         format!("Hello {}", name)
-    //     });
 
     warp::serve(routes).run(([127, 0, 0, 1], 8080)).await;
 }
