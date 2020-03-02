@@ -13,9 +13,21 @@ enum Message {
     Trigger,
 }
 
+#[derive(Deserialize, Debug)]
+struct DockerDeployConfig {}
+
+impl DockerDeployConfig {
+    fn from_file<P: AsRef<std::path::Path>>(path: P) -> Result<Self> {
+        let text = std::fs::read_to_string(path)?;
+        let config = toml::from_str(&text)?;
+        Ok(config)
+    }
+}
+
 struct Controller {
     rx: UnboundedReceiver<Message>,
     docker: Docker,
+    cfg: DockerDeployConfig,
 }
 
 impl Controller {
@@ -178,11 +190,17 @@ mod handlers {
 async fn main() {
     env_logger::init();
 
+    let config = DockerDeployConfig::from_file("config.toml").expect("reading config file");
+
     let (tx, rx) = unbounded_channel();
 
     let docker = Docker::connect_with_local_defaults().expect("connecting to docker");
 
-    let mut controller = Controller { rx, docker };
+    let mut controller = Controller {
+        rx,
+        docker,
+        cfg: DockerDeployConfig {},
+    };
 
     tokio::spawn(async move {
         controller.event_loop().await;
