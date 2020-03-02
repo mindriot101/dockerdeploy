@@ -306,8 +306,10 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "bollard",
+ "env_logger",
  "hyper",
  "listenfd",
+ "log 0.4.8",
  "serde",
  "structopt",
  "tokio",

@@ -1,3 +1,4 @@
+use anyhow::Result;
 use serde::Deserialize;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver};
 use warp::Filter;
@@ -5,8 +6,6 @@ use warp::Filter;
 #[derive(Debug, Clone, Deserialize)]
 enum Message {
     Trigger,
-    Webhook,
-    Poll,
 }
 
 struct Controller {
@@ -16,8 +15,35 @@ struct Controller {
 impl Controller {
     async fn event_loop(&mut self) {
         while let Some(msg) = self.rx.recv().await {
-            println!("{:?}", msg);
+            match msg {
+                Message::Trigger => match self.trigger_refresh().await {
+                    Ok(_) => {}
+                    Err(e) => log::warn!("error in handler: {:?}", e),
+                },
+            }
         }
+    }
+
+    async fn trigger_refresh(&mut self) -> Result<()> {
+        self.pull_image().await?;
+        self.stop_running_contianer().await?;
+        self.run_container().await?;
+        Ok(())
+    }
+
+    async fn pull_image(&mut self) -> Result<()> {
+        log::info!("pulling image");
+        Ok(())
+    }
+
+    async fn stop_running_contianer(&mut self) -> Result<()> {
+        log::info!("stopping running container");
+        Ok(())
+    }
+
+    async fn run_container(&mut self) -> Result<()> {
+        log::info!("running new container");
+        Ok(())
     }
 }
 
@@ -49,7 +75,7 @@ mod routes {
     ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
         warp::path!("webhook")
             .and(warp::post())
-            .and(json_body())
+            // .and(json_body())
             .and(with_inbox(tx))
             .and_then(handlers::handle_webhook)
     }
@@ -81,16 +107,16 @@ mod handlers {
     }
 
     pub(crate) async fn handle_webhook(
-        msg: Message,
         _tx: UnboundedSender<Message>,
     ) -> Result<impl warp::Reply, Infallible> {
-        eprintln!("message: {:?}", msg);
         Ok(StatusCode::NO_CONTENT)
     }
 }
 
 #[tokio::main]
 async fn main() {
+    env_logger::init();
+
     let (tx, rx) = unbounded_channel();
 
     let mut controller = Controller { rx };
