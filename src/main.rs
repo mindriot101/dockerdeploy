@@ -22,6 +22,7 @@ struct Controller {
     rx: UnboundedReceiver<Message>,
     docker: Docker,
     cfg: config::DockerDeployConfig,
+    cfg_file: PathBuf,
 }
 
 impl Controller {
@@ -39,7 +40,7 @@ impl Controller {
                     match event.kind {
                         EventKind::Modify(_) => {
                             log::info!("reloading config");
-                            let new_config = config::DockerDeployConfig::from_file("config.toml")
+                            let new_config = config::DockerDeployConfig::from_file(&self.cfg_file)
                                 .expect("reading config file");
                             self.cfg = new_config;
                             log::info!("config reloaded: {:?}", self.cfg);
@@ -158,6 +159,7 @@ async fn main() {
         rx,
         docker,
         cfg: config,
+        cfg_file: opts.config.clone(),
     };
 
     let watcher_tx = tx.clone();
