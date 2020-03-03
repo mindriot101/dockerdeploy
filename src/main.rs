@@ -2,6 +2,8 @@ use anyhow::Result;
 use bollard::Docker;
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use serde::Deserialize;
+use std::path::PathBuf;
+use structopt::StructOpt;
 use tokio::stream::StreamExt;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver};
 use warp::Filter;
@@ -195,9 +197,19 @@ mod handlers {
     }
 }
 
+#[derive(StructOpt, Debug)]
+#[structopt(name = "dockerdeploy", author = "Simon Walker")]
+struct Opts {
+    #[structopt(short, long, help = "Config file to parse", parse(from_os_str))]
+    config: PathBuf,
+}
+
 #[tokio::main]
 async fn main() {
     env_logger::init();
+
+    let opts = Opts::from_args();
+    log::trace!("command line options: {:?}", opts);
 
     let config = config::DockerDeployConfig::from_file("config.toml").expect("reading config file");
     log::debug!("got config {:#?}", config);
@@ -225,7 +237,7 @@ async fn main() {
         .expect("creating watcher");
 
     watcher
-        .watch("config.toml", RecursiveMode::NonRecursive)
+        .watch(opts.config, RecursiveMode::NonRecursive)
         .expect("failed to start watcher");
 
     tokio::spawn(async move {

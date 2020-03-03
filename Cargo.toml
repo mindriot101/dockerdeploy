@@ -9,7 +9,7 @@ edition = "2018"
 [dependencies]
 bollard = "0.5.0"
 tokio = { version = "0.2.12", features = ["macros", "sync"] }
-structopt = "0.3.9"
+structopt = "0.3.11"
 anyhow = "1.0.26"
 warp = "0.2.1"
 serde = { version = "1.0.104", features = ["derive"] }
