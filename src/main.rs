@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use bollard::Docker;
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use serde::Deserialize;
@@ -14,6 +14,7 @@ mod routes;
 
 #[derive(Debug, Clone, Deserialize)]
 enum Message {
+    Poll,
     Trigger,
     Reload(notify::event::Event),
 }
@@ -26,6 +27,21 @@ struct Controller {
 }
 
 impl Controller {
+    fn new(cfg_file: PathBuf, rx: UnboundedReceiver<Message>) -> Result<Self> {
+        let config =
+            config::DockerDeployConfig::from_file(&cfg_file).context("reading config file")?;
+        log::debug!("got config {:#?}", config);
+
+        let docker = Docker::connect_with_local_defaults().expect("connecting to docker");
+
+        Ok(Controller {
+            rx,
+            docker,
+            cfg: config,
+            cfg_file,
+        })
+    }
+
     async fn event_loop(&mut self) {
         while let Some(msg) = self.rx.recv().await {
             match msg {
@@ -33,6 +49,9 @@ impl Controller {
                     Ok(_) => {}
                     Err(e) => log::warn!("error in handler: {:?}", e),
                 },
+                Message::Poll => {
+                    log::debug!("checking on container");
+                }
                 Message::Reload(event) => {
                     use notify::event::EventKind;
 
@@ -148,19 +167,9 @@ async fn main() {
     let opts = Opts::from_args();
     log::trace!("command line options: {:?}", opts);
 
-    let config = config::DockerDeployConfig::from_file(&opts.config).expect("reading config file");
-    log::debug!("got config {:#?}", config);
-
     let (tx, rx) = unbounded_channel();
 
-    let docker = Docker::connect_with_local_defaults().expect("connecting to docker");
-
-    let mut controller = Controller {
-        rx,
-        docker,
-        cfg: config,
-        cfg_file: opts.config.clone(),
-    };
+    let mut controller = Controller::new(opts.config.clone(), rx).expect("creating controller");
 
     let watcher_tx = tx.clone();
     let mut watcher: RecommendedWatcher =
@@ -175,8 +184,20 @@ async fn main() {
         .expect("creating watcher");
 
     watcher
-        .watch(opts.config, RecursiveMode::NonRecursive)
+        .watch(&opts.config, RecursiveMode::NonRecursive)
         .expect("failed to start watcher");
+
+    // Start the poll loop
+    let poll_tx = tx.clone();
+    tokio::spawn(async move {
+        log::info!("starting poll loop");
+        loop {
+            log::debug!("sending poll message");
+            poll_tx.send(Message::Poll).expect("sending poll message");
+            log::debug!("poll loop sleeping for 10 seconds");
+            tokio::time::delay_for(std::time::Duration::from_secs(10)).await;
+        }
+    });
 
     tokio::spawn(async move {
         controller.event_loop().await;
