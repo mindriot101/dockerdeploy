@@ -1,33 +1,23 @@
 use anyhow::Result;
 use bollard::Docker;
+use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use serde::Deserialize;
 use tokio::stream::StreamExt;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver};
 use warp::Filter;
 
-static IMAGE_NAME: &'static str = "ubuntu";
-static CONTAINER_NAME: &'static str = "foobar";
+mod config;
 
 #[derive(Debug, Clone, Deserialize)]
 enum Message {
     Trigger,
-}
-
-#[derive(Deserialize, Debug)]
-struct DockerDeployConfig {}
-
-impl DockerDeployConfig {
-    fn from_file<P: AsRef<std::path::Path>>(path: P) -> Result<Self> {
-        let text = std::fs::read_to_string(path)?;
-        let config = toml::from_str(&text)?;
-        Ok(config)
-    }
+    Reload(notify::event::Event),
 }
 
 struct Controller {
     rx: UnboundedReceiver<Message>,
     docker: Docker,
-    cfg: DockerDeployConfig,
+    cfg: config::DockerDeployConfig,
 }
 
 impl Controller {
@@ -38,6 +28,21 @@ impl Controller {
                     Ok(_) => {}
                     Err(e) => log::warn!("error in handler: {:?}", e),
                 },
+                Message::Reload(event) => {
+                    use notify::event::EventKind;
+
+                    log::trace!("reload event: {:?}", event);
+                    match event.kind {
+                        EventKind::Modify(_) => {
+                            log::info!("reloading config");
+                            let new_config = config::DockerDeployConfig::from_file("config.toml")
+                                .expect("reading config file");
+                            self.cfg = new_config;
+                            log::info!("config reloaded: {:?}", self.cfg);
+                        }
+                        _ => {}
+                    }
+                }
             }
         }
     }
@@ -55,8 +60,8 @@ impl Controller {
         log::info!("pulling image");
 
         let options = Some(CreateImageOptions {
-            from_image: IMAGE_NAME,
-            tag: "latest",
+            from_image: self.cfg.image.name.as_str(),
+            tag: self.cfg.image.tag.as_str(),
             ..Default::default()
         });
 
@@ -77,7 +82,11 @@ impl Controller {
             ..Default::default()
         });
 
-        match self.docker.remove_container(CONTAINER_NAME, options).await {
+        match self
+            .docker
+            .remove_container(&self.cfg.container.name, options)
+            .await
+        {
             Ok(_) => {}
             Err(e) => match e.kind() {
                 bollard::errors::ErrorKind::DockerResponseNotFoundError { .. } => {
@@ -96,13 +105,13 @@ impl Controller {
         log::info!("running new container");
 
         let options = Some(CreateContainerOptions {
-            name: CONTAINER_NAME,
+            name: self.cfg.container.name.clone(),
             ..Default::default()
         });
 
         let config = Config {
-            image: Some(IMAGE_NAME),
-            cmd: Some(vec!["sleep", "86400"]),
+            image: Some(format!("{}:{}", self.cfg.image.name, self.cfg.image.tag)),
+            cmd: Some(self.cfg.container.command.clone()),
             ..Default::default()
         };
 
@@ -190,7 +199,8 @@ mod handlers {
 async fn main() {
     env_logger::init();
 
-    let config = DockerDeployConfig::from_file("config.toml").expect("reading config file");
+    let config = config::DockerDeployConfig::from_file("config.toml").expect("reading config file");
+    log::debug!("got config {:#?}", config);
 
     let (tx, rx) = unbounded_channel();
 
@@ -199,8 +209,24 @@ async fn main() {
     let mut controller = Controller {
         rx,
         docker,
-        cfg: DockerDeployConfig {},
+        cfg: config,
     };
+
+    let watcher_tx = tx.clone();
+    let mut watcher: RecommendedWatcher =
+        Watcher::new_immediate(move |res: notify::Result<notify::event::Event>| match res {
+            Ok(event) => {
+                watcher_tx
+                    .send(Message::Reload(event.clone()))
+                    .expect("reloading config");
+            }
+            Err(e) => eprintln!("error: {:?}", e),
+        })
+        .expect("creating watcher");
+
+    watcher
+        .watch("config.toml", RecursiveMode::NonRecursive)
+        .expect("failed to start watcher");
 
     tokio::spawn(async move {
         controller.event_loop().await;

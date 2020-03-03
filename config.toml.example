@@ -1,0 +1,27 @@
+api_version = "1"
+
+[image]
+name = "python"
+tag = "3.8-slim-buster"
+
+[container]
+name = "foobar"
+command = ["sleep", "86400"]
+
+[[container.ports]]
+host = 5020
+target = 80
+
+[[container.mounts]]
+host = "$PWD/data"
+target = "/data"
+
+[branch]
+name = "master"
+build_on_failure = false
+
+[heartbeat]
+sleep_time = 10
+endpoint = "/heartbeat"
+
+# vim: ft=toml
