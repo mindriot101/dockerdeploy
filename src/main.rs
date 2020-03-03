@@ -5,7 +5,7 @@ use serde::Deserialize;
 use std::path::PathBuf;
 use structopt::StructOpt;
 use tokio::stream::StreamExt;
-use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver};
+use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 use warp::Filter;
 
 mod config;
@@ -20,6 +20,7 @@ enum Message {
 }
 
 struct Controller {
+    tx: UnboundedSender<Message>,
     rx: UnboundedReceiver<Message>,
     docker: Docker,
     cfg: config::DockerDeployConfig,
@@ -27,7 +28,11 @@ struct Controller {
 }
 
 impl Controller {
-    fn new(cfg_file: PathBuf, rx: UnboundedReceiver<Message>) -> Result<Self> {
+    fn new(
+        cfg_file: PathBuf,
+        tx: UnboundedSender<Message>,
+        rx: UnboundedReceiver<Message>,
+    ) -> Result<Self> {
         let config =
             config::DockerDeployConfig::from_file(&cfg_file).context("reading config file")?;
         log::debug!("got config {:#?}", config);
@@ -35,6 +40,7 @@ impl Controller {
         let docker = Docker::connect_with_local_defaults().expect("connecting to docker");
 
         Ok(Controller {
+            tx,
             rx,
             docker,
             cfg: config,
@@ -50,7 +56,38 @@ impl Controller {
                     Err(e) => log::warn!("error in handler: {:?}", e),
                 },
                 Message::Poll => {
+                    use bollard::container::InspectContainerOptions;
+
                     log::debug!("checking on container");
+
+                    let options = Some(InspectContainerOptions {
+                        size: false,
+                        ..Default::default()
+                    });
+
+                    match self
+                        .docker
+                        .inspect_container(&self.cfg.container.name, options)
+                        .await
+                    {
+                        Ok(_) => {
+                            log::info!("found configured container `{}`", self.cfg.container.name)
+                        }
+                        Err(e) => match e.kind() {
+                            bollard::errors::ErrorKind::DockerResponseNotFoundError { .. } => {
+                                log::info!("configured container not running, starting");
+                                // Trigger a refresh
+                                self.tx
+                                    .send(Message::Trigger)
+                                    .expect("sending trigger request");
+                            }
+                            _ => log::warn!(
+                                "error inspecting container {}: {:?}",
+                                self.cfg.container.name,
+                                e
+                            ),
+                        },
+                    }
                 }
                 Message::Reload(event) => {
                     use notify::event::EventKind;
@@ -169,7 +206,8 @@ async fn main() {
 
     let (tx, rx) = unbounded_channel();
 
-    let mut controller = Controller::new(opts.config.clone(), rx).expect("creating controller");
+    let mut controller =
+        Controller::new(opts.config.clone(), tx.clone(), rx).expect("creating controller");
 
     let watcher_tx = tx.clone();
     let mut watcher: RecommendedWatcher =
