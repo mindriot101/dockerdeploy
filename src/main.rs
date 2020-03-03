@@ -147,7 +147,7 @@ async fn main() {
     let opts = Opts::from_args();
     log::trace!("command line options: {:?}", opts);
 
-    let config = config::DockerDeployConfig::from_file("config.toml").expect("reading config file");
+    let config = config::DockerDeployConfig::from_file(&opts.config).expect("reading config file");
     log::debug!("got config {:#?}", config);
 
     let (tx, rx) = unbounded_channel();
