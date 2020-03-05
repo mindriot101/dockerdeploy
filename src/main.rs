@@ -4,13 +4,15 @@ use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use serde::Deserialize;
 use std::path::PathBuf;
 use structopt::StructOpt;
-use tokio::stream::StreamExt;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
 use warp::Filter;
 
 mod config;
+mod dockerclient;
 mod handlers;
 mod routes;
+
+use dockerclient::DockerApi;
 
 #[derive(Debug, Clone, Deserialize)]
 enum Message {
@@ -19,16 +21,17 @@ enum Message {
     Reload(notify::event::Event),
 }
 
-struct Controller {
+struct Controller<D> {
     tx: UnboundedSender<Message>,
     rx: UnboundedReceiver<Message>,
-    docker: Docker,
+    docker: D,
     cfg: config::DockerDeployConfig,
     cfg_file: PathBuf,
 }
 
-impl Controller {
+impl<D: DockerApi> Controller<D> {
     fn new(
+        docker: D,
         cfg_file: PathBuf,
         tx: UnboundedSender<Message>,
         rx: UnboundedReceiver<Message>,
@@ -36,8 +39,6 @@ impl Controller {
         let config =
             config::DockerDeployConfig::from_file(&cfg_file).context("reading config file")?;
         log::debug!("got config {:#?}", config);
-
-        let docker = Docker::connect_with_local_defaults().expect("connecting to docker");
 
         Ok(Controller {
             tx,
@@ -56,32 +57,45 @@ impl Controller {
                     Err(e) => log::warn!("error in handler: {:?}", e),
                 },
                 Message::Poll => {
-                    use bollard::container::InspectContainerOptions;
-
                     log::debug!("checking on container");
-
-                    let options = Some(InspectContainerOptions {
-                        size: false,
-                        ..Default::default()
-                    });
 
                     match self
                         .docker
-                        .inspect_container(&self.cfg.container.name, options)
+                        .is_container_running(&self.cfg.container.name)
                         .await
                     {
-                        Ok(_) => {
-                            log::info!("found configured container `{}`", self.cfg.container.name)
-                        }
-                        Err(e) => match e.kind() {
-                            bollard::errors::ErrorKind::DockerResponseNotFoundError { .. } => {
+                        Ok(r) => {
+                            if !r {
                                 log::info!("configured container not running, starting");
                                 // Trigger a refresh
                                 self.tx
                                     .send(Message::Trigger)
                                     .expect("sending trigger request");
+                            } else {
+                                log::info!(
+                                    "found configured container `{}`",
+                                    self.cfg.container.name
+                                )
                             }
-                            _ => log::warn!(
+                        }
+                        Err(e) => match e.downcast_ref::<bollard::errors::Error>() {
+                            Some(e) => match e.kind() {
+                                bollard::errors::ErrorKind::DockerResponseNotFoundError {
+                                    ..
+                                } => {
+                                    log::info!("configured container not running, starting");
+                                    // Trigger a refresh
+                                    self.tx
+                                        .send(Message::Trigger)
+                                        .expect("sending trigger request");
+                                }
+                                _ => log::warn!(
+                                    "error inspecting container {}: {:?}",
+                                    self.cfg.container.name,
+                                    e
+                                ),
+                            },
+                            None => log::warn!(
                                 "error inspecting container {}: {:?}",
                                 self.cfg.container.name,
                                 e
@@ -116,44 +130,31 @@ impl Controller {
     }
 
     async fn pull_image(&mut self) -> Result<()> {
-        use bollard::image::CreateImageOptions;
+        use dockerclient::CreateImageOptions;
 
         log::info!("pulling image");
 
-        let options = Some(CreateImageOptions {
+        let options = CreateImageOptions {
             from_image: self.cfg.image.name.as_str(),
             tag: self.cfg.image.tag.as_str(),
-            ..Default::default()
-        });
+        };
 
-        let mut out_stream = self.docker.create_image(options, None, None);
-        while let Some(msg) = out_stream.next().await {
-            log::debug!("{:?}", msg);
-        }
-        Ok(())
+        self.docker.create_image(options).await
     }
 
     async fn stop_running_contianer(&mut self) -> Result<()> {
-        use bollard::container::RemoveContainerOptions;
-
         log::info!("stopping running container");
 
-        let options = Some(RemoveContainerOptions {
-            force: true,
-            ..Default::default()
-        });
-
-        match self
-            .docker
-            .remove_container(&self.cfg.container.name, options)
-            .await
-        {
+        match self.docker.remove_container(&self.cfg.container.name).await {
             Ok(_) => {}
-            Err(e) => match e.kind() {
-                bollard::errors::ErrorKind::DockerResponseNotFoundError { .. } => {
-                    log::debug!("running container not found")
-                }
-                _ => return Err(e.into()),
+            Err(e) => match e.downcast_ref::<bollard::errors::Error>() {
+                Some(e) => match e.kind() {
+                    bollard::errors::ErrorKind::DockerResponseNotFoundError { .. } => {
+                        log::debug!("running container not found")
+                    }
+                    _ => anyhow::bail!("bad"),
+                },
+                None => anyhow::bail!("bad"),
             },
         }
 
@@ -161,29 +162,22 @@ impl Controller {
     }
 
     async fn run_container(&mut self) -> Result<()> {
-        use bollard::container::{Config, CreateContainerOptions, StartContainerOptions};
-
         log::info!("running new container");
 
-        let options = Some(CreateContainerOptions {
-            name: self.cfg.container.name.clone(),
-            ..Default::default()
-        });
-
-        let config = Config {
-            image: Some(format!("{}:{}", self.cfg.image.name, self.cfg.image.tag)),
-            cmd: Some(self.cfg.container.command.clone()),
-            ..Default::default()
-        };
-
-        let res = self.docker.create_container(options, config).await?;
-        for warning in res.warnings.unwrap_or(Vec::new()) {
-            log::warn!("container create warning: {}", warning);
-        }
-
-        // Start the new container
+        let image = format!("{}:{}", self.cfg.image.name, self.cfg.image.tag);
+        let cmd = self
+            .cfg
+            .container
+            .command
+            .iter()
+            .map(|s| s.as_ref())
+            .collect();
         self.docker
-            .start_container(&res.id, None::<StartContainerOptions<String>>)
+            .run_container(crate::dockerclient::RunContainerOptions {
+                name: &self.cfg.container.name,
+                image: &image,
+                cmd,
+            })
             .await?;
 
         Ok(())
@@ -206,8 +200,9 @@ async fn main() {
 
     let (tx, rx) = unbounded_channel();
 
+    let docker = Docker::connect_with_local_defaults().expect("connecting to docker");
     let mut controller =
-        Controller::new(opts.config.clone(), tx.clone(), rx).expect("creating controller");
+        Controller::new(docker, opts.config.clone(), tx.clone(), rx).expect("creating controller");
 
     let watcher_tx = tx.clone();
     let mut watcher: RecommendedWatcher =
