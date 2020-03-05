@@ -38,7 +38,7 @@ impl<D: DockerApi> Controller<D> {
     ) -> Result<Self> {
         let config =
             config::DockerDeployConfig::from_file(&cfg_file).context("reading config file")?;
-        log::debug!("got config {:#?}", config);
+        log::debug!("got config {:?}", config);
 
         Ok(Controller {
             tx,
