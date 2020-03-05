@@ -241,3 +241,46 @@ async fn main() {
 
     warp::serve(routes).run(([127, 0, 0, 1], 8080)).await;
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::dockerclient::{
+        CreateContainerResults, CreateImageOptions, DockerApi, RunContainerOptions,
+    };
+    use anyhow::Result;
+    use async_trait::async_trait;
+
+    struct MockDocker;
+
+    #[async_trait]
+    impl DockerApi for MockDocker {
+        async fn is_container_running(&self, container_name: &str) -> Result<bool> {
+            todo!()
+        }
+
+        async fn remove_container(&self, container_name: &str) -> Result<()> {
+            todo!()
+        }
+
+        async fn run_container<'a>(
+            &'a self,
+            options: RunContainerOptions<'a>,
+        ) -> Result<CreateContainerResults> {
+            todo!()
+        }
+
+        async fn create_image<'a>(&'a self, options: CreateImageOptions<'a>) -> Result<()> {
+            todo!()
+        }
+    }
+
+    #[tokio::test]
+    async fn test_creating_custom_controller() {
+        let docker = MockDocker {};
+        let (tx, rx) = unbounded_channel();
+        let config = PathBuf::from("config.toml.example");
+        let controller = Controller::new(docker, config, tx, rx).unwrap();
+        assert!(true);
+    }
+}

@@ -1,7 +1,7 @@
 use anyhow::Result;
 use serde::Deserialize;
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Default)]
 pub(crate) struct DockerDeployConfig {
     pub(crate) api_version: String,
     pub(crate) image: ImageConfig,
@@ -18,13 +18,13 @@ impl DockerDeployConfig {
     }
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Default)]
 pub(crate) struct ImageConfig {
     pub(crate) name: String,
     pub(crate) tag: String,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Default)]
 pub(crate) struct ContainerConfig {
     pub(crate) name: String,
     pub(crate) command: Vec<String>,
@@ -32,25 +32,25 @@ pub(crate) struct ContainerConfig {
     pub(crate) mounts: Vec<MountConfig>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Default)]
 pub(crate) struct PortConfig {
     pub(crate) host: u32,
     pub(crate) target: u32,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Default)]
 pub(crate) struct MountConfig {
     pub(crate) host: String,
     pub(crate) target: String,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Default)]
 pub struct BranchConfig {
     pub(crate) name: String,
     pub(crate) build_on_failure: bool,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Default)]
 pub struct HeartbeatConfig {
     pub(crate) sleep_time: i64,
     pub(crate) endpoint: String,

@@ -25,11 +25,11 @@ pub(crate) trait DockerApi {
     async fn remove_container(&self, container_name: &str) -> Result<()>;
 
     async fn run_container<'a>(
-        &self,
+        &'a self,
         options: RunContainerOptions<'a>,
     ) -> Result<CreateContainerResults>;
 
-    async fn create_image<'a>(&self, options: CreateImageOptions<'a>) -> Result<()>;
+    async fn create_image<'a>(&'a self, options: CreateImageOptions<'a>) -> Result<()>;
 }
 
 #[async_trait]
@@ -79,7 +79,7 @@ impl DockerApi for bollard::Docker {
     }
 
     async fn run_container<'a>(
-        &self,
+        &'a self,
         options: RunContainerOptions<'a>,
     ) -> Result<CreateContainerResults> {
         use bollard::container::{Config, CreateContainerOptions, StartContainerOptions};
@@ -106,7 +106,7 @@ impl DockerApi for bollard::Docker {
         })
     }
 
-    async fn create_image<'a>(&self, options: CreateImageOptions<'a>) -> Result<()> {
+    async fn create_image<'a>(&'a self, options: CreateImageOptions<'a>) -> Result<()> {
         use bollard::image;
 
         let options = Some(image::CreateImageOptions {
