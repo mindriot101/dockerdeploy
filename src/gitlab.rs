@@ -20,19 +20,17 @@ pub(crate) struct Pipeline {
 
 impl Pipeline {
     pub(crate) fn should_rerun_pipeline(&self) -> bool {
-        self.is_master() && self.no_builds_failed()
+        self.is_master() && self.all_builds_passed_or_skipped()
     }
 
     fn is_master(&self) -> bool {
         self.object_attributes.object_ref == "master"
     }
 
-    fn no_builds_failed(&self) -> bool {
+    fn all_builds_passed_or_skipped(&self) -> bool {
         self.builds
             .iter()
-            .filter(|b| b.status == Status::Failed)
-            .count()
-            == 0
+            .all(|b| b.status == Status::Success || b.status == Status::Skipped)
     }
 }
 
@@ -95,9 +93,6 @@ mod tests {
                 },
                 Build {
                     status: Status::Skipped,
-                },
-                Build {
-                    status: Status::Created,
                 },
             ],
             object_attributes: ObjectAttributes {
