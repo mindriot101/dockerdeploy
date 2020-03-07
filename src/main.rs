@@ -9,6 +9,7 @@ use warp::Filter;
 
 mod config;
 mod dockerclient;
+mod gitlab;
 mod handlers;
 mod routes;
 

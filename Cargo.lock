@@ -350,6 +350,7 @@ dependencies = [
  "log 0.4.8",
  "notify",
  "serde",
+ "serde_json",
  "structopt",
  "tokio",
  "toml",
