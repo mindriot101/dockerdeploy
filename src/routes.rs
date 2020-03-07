@@ -1,3 +1,4 @@
+use crate::gitlab::Event;
 use crate::handlers;
 use crate::Message;
 use tokio::sync::mpsc::UnboundedSender;
@@ -25,7 +26,7 @@ pub(crate) fn webhook(
 ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
     warp::path!("webhook")
         .and(warp::post())
-        // .and(json_body())
+        .and(json_body())
         .and(with_inbox(tx))
         .and_then(handlers::handle_webhook)
 }
@@ -36,6 +37,6 @@ fn with_inbox(
     warp::any().map(move || tx.clone())
 }
 
-fn json_body() -> impl Filter<Extract = (Message,), Error = warp::Rejection> + Clone {
+fn json_body() -> impl Filter<Extract = (Event,), Error = warp::Rejection> + Clone {
     warp::body::json()
 }

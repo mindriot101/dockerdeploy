@@ -19,7 +19,7 @@ pub(crate) struct Pipeline {
 }
 
 impl Pipeline {
-    fn should_rerun_pipeline(&self) -> bool {
+    pub(crate) fn should_rerun_pipeline(&self) -> bool {
         self.is_master() && self.no_builds_failed()
     }
 
