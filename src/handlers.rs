@@ -19,12 +19,16 @@ pub(crate) async fn handle_webhook(
     // Check that the incoming event is a gitlab one and that matches the pipeline event type
     log::debug!("got event {:?}", event);
 
-    let Event::Pipeline(pipeline) = event;
-    if pipeline.should_rerun_pipeline() {
-        log::info!("webhook trigger accepted");
-        tx.send(Message::Trigger).unwrap();
+    if let Event::Pipeline(pipeline) = event {
+        log::debug!("pipeline event configured to run new deploy");
+        if pipeline.should_rerun_pipeline() {
+            log::info!("webhook trigger accepted");
+            tx.send(Message::Trigger).unwrap();
+        } else {
+            log::info!("webhook trigger rejected");
+        }
     } else {
-        log::info!("webhook trigger rejected");
+        log::debug!("{:?} event _not_ configured to run new deploy", event);
     }
 
     Ok(StatusCode::NO_CONTENT)

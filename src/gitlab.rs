@@ -10,6 +10,20 @@ use serde::Deserialize;
 pub(crate) enum Event {
     #[serde(rename = "pipeline")]
     Pipeline(Pipeline),
+    #[serde(rename = "push")]
+    Push,
+    #[serde(rename = "tag_push")]
+    TagPush,
+    #[serde(rename = "build")]
+    Build,
+    #[serde(rename = "issue")]
+    Issue,
+    #[serde(rename = "note")]
+    Note,
+    #[serde(rename = "merge_request")]
+    MergeRequest,
+    #[serde(rename = "wiki_page")]
+    WikiPage,
 }
 
 #[derive(Deserialize, Debug)]
