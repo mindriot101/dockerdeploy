@@ -173,13 +173,18 @@ impl<D: DockerApi> Controller<D> {
             .iter()
             .map(|s| s.as_ref())
             .collect();
-        self.docker
+        let res = self
+            .docker
             .run_container(crate::dockerclient::RunContainerOptions {
                 name: &self.cfg.container.name,
                 image: &image,
                 cmd,
             })
             .await?;
+
+        for warning in res.warnings {
+            log::warn!("run_container warning: {}", warning);
+        }
 
         Ok(())
     }
