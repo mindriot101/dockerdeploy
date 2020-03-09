@@ -5,3 +5,10 @@ jobs:
   format: rust/format
   clippy: rust/clippy
   test: rust/test
+workflows:
+  version: 2
+  all:
+    jobs:
+      - format
+      - clippy
+      - test
