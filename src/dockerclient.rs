@@ -36,10 +36,7 @@ pub(crate) trait DockerApi {
 impl DockerApi for bollard::Docker {
     async fn is_container_running(&self, container_name: &str) -> Result<bool> {
         use bollard::container::InspectContainerOptions;
-        let options = Some(InspectContainerOptions {
-            size: false,
-            ..Default::default()
-        });
+        let options = Some(InspectContainerOptions { size: false });
 
         match Docker::inspect_container(self, container_name, options).await {
             Ok(_) => Ok(true),
@@ -84,10 +81,7 @@ impl DockerApi for bollard::Docker {
     ) -> Result<CreateContainerResults> {
         use bollard::container::{Config, CreateContainerOptions, StartContainerOptions};
 
-        let c_options = Some(CreateContainerOptions {
-            name: options.name,
-            ..Default::default()
-        });
+        let c_options = Some(CreateContainerOptions { name: options.name });
 
         let cmd = options.cmd;
         let config = Config {
@@ -102,7 +96,7 @@ impl DockerApi for bollard::Docker {
         Docker::start_container(self, &res.id, None::<StartContainerOptions<String>>).await?;
 
         Ok(CreateContainerResults {
-            warnings: res.warnings.unwrap_or_else(|| Vec::new()),
+            warnings: res.warnings.unwrap_or_else(Vec::new),
         })
     }
 

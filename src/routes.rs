@@ -7,7 +7,7 @@ use warp::Filter;
 pub(crate) fn build(
     tx: UnboundedSender<Message>,
 ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-    trigger(tx.clone()).or(webhook(tx.clone()))
+    trigger(tx.clone()).or(webhook(tx))
 }
 
 /// POST /api/trigger

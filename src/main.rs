@@ -108,15 +108,12 @@ impl<D: DockerApi> Controller<D> {
                     use notify::event::EventKind;
 
                     log::trace!("reload event: {:?}", event);
-                    match event.kind {
-                        EventKind::Modify(_) => {
-                            log::info!("reloading config");
-                            let new_config = config::DockerDeployConfig::from_file(&self.cfg_file)
-                                .expect("reading config file");
-                            self.cfg = new_config;
-                            log::info!("config reloaded: {:?}", self.cfg);
-                        }
-                        _ => {}
+                    if let EventKind::Modify(_) = event.kind {
+                        log::info!("reloading config");
+                        let new_config = config::DockerDeployConfig::from_file(&self.cfg_file)
+                            .expect("reading config file");
+                        self.cfg = new_config;
+                        log::info!("config reloaded: {:?}", self.cfg);
                     }
                 }
             }
@@ -215,7 +212,7 @@ async fn main() {
         Watcher::new_immediate(move |res: notify::Result<notify::event::Event>| match res {
             Ok(event) => {
                 watcher_tx
-                    .send(Message::Reload(event.clone()))
+                    .send(Message::Reload(event))
                     .expect("reloading config");
             }
             Err(e) => eprintln!("error: {:?}", e),
@@ -261,22 +258,22 @@ mod tests {
 
     #[async_trait]
     impl DockerApi for MockDocker {
-        async fn is_container_running(&self, container_name: &str) -> Result<bool> {
+        async fn is_container_running(&self, _container_name: &str) -> Result<bool> {
             todo!()
         }
 
-        async fn remove_container(&self, container_name: &str) -> Result<()> {
+        async fn remove_container(&self, _container_name: &str) -> Result<()> {
             todo!()
         }
 
         async fn run_container<'a>(
             &'a self,
-            options: RunContainerOptions<'a>,
+            _options: RunContainerOptions<'a>,
         ) -> Result<CreateContainerResults> {
             todo!()
         }
 
-        async fn create_image<'a>(&'a self, options: CreateImageOptions<'a>) -> Result<()> {
+        async fn create_image<'a>(&'a self, _options: CreateImageOptions<'a>) -> Result<()> {
             todo!()
         }
     }
@@ -286,7 +283,6 @@ mod tests {
         let docker = MockDocker {};
         let (tx, rx) = unbounded_channel();
         let config = PathBuf::from("config.toml.example");
-        let controller = Controller::new(docker, config, tx, rx).unwrap();
-        assert!(true);
+        let _controller = Controller::new(docker, config, tx, rx).unwrap();
     }
 }

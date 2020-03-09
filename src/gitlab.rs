@@ -94,7 +94,7 @@ mod tests {
                     ]
                 );
             }
-            _ => assert!(false, "wrong event type"),
+            _ => unreachable!("wrong event type"),
         }
     }
 
@@ -169,7 +169,7 @@ mod tests {
             "should_rerun_pipeline should not run but did"
         );
     }
-    static WEBHOOK_EVENT: &'static str = r#"
+    static WEBHOOK_EVENT: &str = r#"
     {
    "object_kind": "pipeline",
    "object_attributes":{
