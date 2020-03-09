@@ -6,14 +6,18 @@ This process is a daemon that:
 
 - exposes a web server that can trigger a docker pull
 - refreshes (replaces) a running container
-- remembers which containers it's managing and knows the state
+- remembers which containers it's managing and checks on the state of managed
+  containers
 
 ## API endpoints
 
-- `/api/v1/refresh` - refresh a single container
-	- method: `POST`
-	- data: `{"image": "string", "name": "string", "force": "boolean"}"
-- `/api/v1/list` - list status of known containers
-	- method: `GET`
-- `/api/v1/status/<containername>` - get the status of a single container
-	- method: `GET`
+- `/webhook` - let gitlab pipeline updates trigger a container refresh
+- `/trigger` - manually trigger a container refresh
+
+### Webhook
+
+Add this into the gitlab webhook interface
+
+### Trigger
+
+`curl -X POST -H 'Content-Type: application/json' <server ip>:<server port>/trigger
