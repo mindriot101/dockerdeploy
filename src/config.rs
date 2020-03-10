@@ -4,6 +4,7 @@ use serde::Deserialize;
 #[derive(Deserialize, Debug, Default)]
 pub(crate) struct DockerDeployConfig {
     pub(crate) api_version: String,
+    pub(crate) validation_key: Option<String>,
     pub(crate) image: ImageConfig,
     pub(crate) container: ContainerConfig,
     pub(crate) branch: BranchConfig,

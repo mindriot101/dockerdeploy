@@ -1,4 +1,5 @@
 api_version = "1"
+validation_key = "my-validation-key"
 
 [image]
 name = "python"
