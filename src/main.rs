@@ -185,6 +185,10 @@ impl<D: DockerApi> Controller<D> {
 
         Ok(())
     }
+
+    pub(crate) fn validation_key(&self) -> Option<String> {
+        self.cfg.validation_key.clone()
+    }
 }
 
 #[derive(StructOpt, Debug)]
@@ -235,11 +239,13 @@ async fn main() {
         }
     });
 
+    let key = controller.validation_key();
+
     tokio::spawn(async move {
         controller.event_loop().await;
     });
 
-    let api = routes::build(tx);
+    let api = routes::build(tx, key);
     let routes = api.with(warp::log("dockerdeploy"));
 
     warp::serve(routes).run(([127, 0, 0, 1], 8080)).await;
