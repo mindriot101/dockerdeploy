@@ -34,11 +34,15 @@ pub(crate) struct Pipeline {
 
 impl Pipeline {
     pub(crate) fn should_rerun_pipeline(&self) -> bool {
-        self.is_master() && self.all_builds_passed_or_skipped()
+        self.is_master() && self.has_builds() && self.all_builds_passed_or_skipped()
     }
 
     fn is_master(&self) -> bool {
         self.object_attributes.object_ref == "master"
+    }
+
+    fn has_builds(&self) -> bool {
+        !self.builds.is_empty()
     }
 
     fn all_builds_passed_or_skipped(&self) -> bool {

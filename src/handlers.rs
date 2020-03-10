@@ -47,10 +47,11 @@ pub(crate) async fn handle_webhook(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::gitlab::{Event, ObjectAttributes, Pipeline};
+    use crate::gitlab::{Build, Event, ObjectAttributes, Pipeline, Status};
     use tokio::sync::mpsc::unbounded_channel;
     use warp::reply::Reply;
 
+    // Tests for header validation
     #[tokio::test]
     async fn test_webhook_happy_path() {
         let header_key = Some("abc".to_string());
@@ -154,5 +155,129 @@ mod tests {
 
         let response = res.into_response();
         assert_eq!(response.status(), StatusCode::NO_CONTENT);
+    }
+
+    // Tests for sending events
+    #[tokio::test]
+    async fn test_webhook_rebuild() {
+        let event = Event::Pipeline(Pipeline {
+            builds: vec![Build {
+                status: Status::Success,
+            }],
+            object_attributes: ObjectAttributes {
+                object_ref: "master".to_string(),
+            },
+        });
+        // TODO: check response from channel
+        let (tx, mut rx) = unbounded_channel();
+
+        tokio::spawn(async move {
+            let res = handle_webhook(None, event, tx, None).await.unwrap();
+
+            let response = res.into_response();
+            assert_eq!(response.status(), StatusCode::NO_CONTENT);
+        });
+
+        match rx.recv().await {
+            // Not trigger message
+            Some(msg) => assert_eq!(msg, Message::Trigger),
+            None => unreachable!("sender dropped"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_webhook_not_run_non_master() {
+        let event = Event::Pipeline(Pipeline {
+            builds: vec![Build {
+                status: Status::Success,
+            }],
+            object_attributes: ObjectAttributes {
+                object_ref: "foobar".to_string(),
+            },
+        });
+        // TODO: check response from channel
+        let (tx, mut rx) = unbounded_channel();
+
+        let tx2 = tx.clone();
+        tokio::spawn(async move {
+            let res = handle_webhook(None, event, tx2, None).await.unwrap();
+
+            let response = res.into_response();
+            assert_eq!(response.status(), StatusCode::NO_CONTENT);
+        });
+
+        // Send the debug message for when the handler does not send a response
+        tx.send(Message::Debug).unwrap();
+
+        match rx.recv().await {
+            // Not trigger message
+            Some(msg) => assert!(msg != Message::Trigger),
+            None => unreachable!("sender dropped"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_webhook_not_run_with_failures() {
+        let event = Event::Pipeline(Pipeline {
+            builds: vec![
+                Build {
+                    status: Status::Success,
+                },
+                Build {
+                    status: Status::Failed,
+                },
+            ],
+            object_attributes: ObjectAttributes {
+                object_ref: "master".to_string(),
+            },
+        });
+        // TODO: check response from channel
+        let (tx, mut rx) = unbounded_channel();
+
+        let tx2 = tx.clone();
+        tokio::spawn(async move {
+            let res = handle_webhook(None, event, tx2, None).await.unwrap();
+
+            let response = res.into_response();
+            assert_eq!(response.status(), StatusCode::NO_CONTENT);
+        });
+
+        // Send the debug message for when the handler does not send a response
+        tx.send(Message::Debug).unwrap();
+
+        match rx.recv().await {
+            // Not trigger message
+            Some(msg) => assert!(msg != Message::Trigger),
+            None => unreachable!("sender dropped"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_webhook_no_redeploy_with_no_builds() {
+        let event = Event::Pipeline(Pipeline {
+            builds: Vec::new(),
+            object_attributes: ObjectAttributes {
+                object_ref: "master".to_string(),
+            },
+        });
+        // TODO: check response from channel
+        let (tx, mut rx) = unbounded_channel();
+
+        let tx2 = tx.clone();
+        tokio::spawn(async move {
+            let res = handle_webhook(None, event, tx2, None).await.unwrap();
+
+            let response = res.into_response();
+            assert_eq!(response.status(), StatusCode::NO_CONTENT);
+        });
+
+        // Send the debug message for when the handler does not send a response
+        tx.send(Message::Debug).unwrap();
+
+        match rx.recv().await {
+            // Not trigger message
+            Some(msg) => assert!(msg != Message::Trigger),
+            None => unreachable!("sender dropped"),
+        }
     }
 }
