@@ -15,11 +15,12 @@ mod routes;
 
 use dockerclient::DockerApi;
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 enum Message {
     Poll,
     Trigger,
     Reload(notify::event::Event),
+    Debug,
 }
 
 struct Controller<D> {
@@ -116,6 +117,7 @@ impl<D: DockerApi> Controller<D> {
                         log::info!("config reloaded: {:?}", self.cfg);
                     }
                 }
+                Message::Debug => {}
             }
         }
     }
