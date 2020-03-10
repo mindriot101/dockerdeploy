@@ -2,12 +2,14 @@ use crate::gitlab::Event;
 use crate::handlers;
 use crate::Message;
 use tokio::sync::mpsc::UnboundedSender;
+use warp::filters::header::optional;
 use warp::Filter;
 
 pub(crate) fn build(
     tx: UnboundedSender<Message>,
+    validation_key: Option<String>,
 ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-    trigger(tx.clone()).or(webhook(tx))
+    trigger(tx.clone()).or(webhook(tx, validation_key))
 }
 
 /// POST /api/trigger
@@ -23,11 +25,16 @@ pub(crate) fn trigger(
 /// POST /api/webhook
 pub(crate) fn webhook(
     tx: UnboundedSender<Message>,
+    validation_key: Option<String>,
 ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+    let key = warp::any().map(move || validation_key.clone());
+
     warp::path!("webhook")
         .and(warp::post())
+        .and(optional::<String>("X-Gitlab-Token"))
         .and(json_body())
         .and(with_inbox(tx))
+        .and(key)
         .and_then(handlers::handle_webhook)
 }
 
