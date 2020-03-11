@@ -2,6 +2,7 @@ use anyhow::{Context, Result};
 use bollard::Docker;
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use serde::Deserialize;
+use std::net::IpAddr;
 use std::path::PathBuf;
 use structopt::StructOpt;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
@@ -191,6 +192,10 @@ impl<D: DockerApi> Controller<D> {
     pub(crate) fn validation_key(&self) -> Option<String> {
         self.cfg.validation_key.clone()
     }
+
+    pub(crate) fn config(&self) -> &config::DockerDeployConfig {
+        &self.cfg
+    }
 }
 
 #[derive(StructOpt, Debug)]
@@ -242,6 +247,20 @@ async fn main() {
     });
 
     let key = controller.validation_key();
+    let ip_address: IpAddr = controller
+        .config()
+        .server
+        .as_ref()
+        .and_then(|s| s.ip_address.clone())
+        .unwrap_or_else(|| "127.0.0.1".to_string())
+        .parse()
+        .expect("parsing IP address");
+    let port = controller
+        .config()
+        .server
+        .as_ref()
+        .and_then(|s| s.port)
+        .unwrap_or(8080);
 
     tokio::spawn(async move {
         controller.event_loop().await;
@@ -250,7 +269,7 @@ async fn main() {
     let api = routes::build(tx, key);
     let routes = api.with(warp::log("dockerdeploy"));
 
-    warp::serve(routes).run(([127, 0, 0, 1], 8080)).await;
+    warp::serve(routes).run((ip_address, port)).await;
 }
 
 #[cfg(test)]

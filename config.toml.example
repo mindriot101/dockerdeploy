@@ -1,6 +1,10 @@
 api_version = "1"
 validation_key = "my-validation-key"
 
+[server]
+ip_address = "127.0.0.1"
+port = 8080
+
 [image]
 name = "python"
 tag = "3.8-slim-buster"

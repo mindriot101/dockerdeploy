@@ -5,6 +5,7 @@ use serde::Deserialize;
 pub(crate) struct DockerDeployConfig {
     pub(crate) api_version: String,
     pub(crate) validation_key: Option<String>,
+    pub(crate) server: Option<ServerConfig>,
     pub(crate) image: ImageConfig,
     pub(crate) container: ContainerConfig,
     pub(crate) branch: BranchConfig,
@@ -17,6 +18,12 @@ impl DockerDeployConfig {
         let config = toml::from_str(&text)?;
         Ok(config)
     }
+}
+
+#[derive(Deserialize, Debug, Default)]
+pub(crate) struct ServerConfig {
+    pub(crate) ip_address: Option<String>,
+    pub(crate) port: Option<u16>,
 }
 
 #[derive(Deserialize, Debug, Default)]
@@ -55,4 +62,15 @@ pub struct BranchConfig {
 pub struct HeartbeatConfig {
     pub(crate) sleep_time: i64,
     pub(crate) endpoint: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_example_config() {
+        // This test makes sure the example config stays in line with the parsing code.
+        let _config = DockerDeployConfig::from_file("config.toml.example");
+    }
 }
