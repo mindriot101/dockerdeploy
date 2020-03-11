@@ -5,6 +5,7 @@ use serde::Deserialize;
 pub(crate) struct DockerDeployConfig {
     pub(crate) api_version: String,
     pub(crate) validation_key: Option<String>,
+    pub(crate) server: Option<ServerConfig>,
     pub(crate) image: ImageConfig,
     pub(crate) container: ContainerConfig,
     pub(crate) branch: BranchConfig,
@@ -17,6 +18,12 @@ impl DockerDeployConfig {
         let config = toml::from_str(&text)?;
         Ok(config)
     }
+}
+
+#[derive(Deserialize, Debug, Default)]
+pub(crate) struct ServerConfig {
+    pub(crate) ip_address: Option<String>,
+    pub(crate) port: Option<u16>,
 }
 
 #[derive(Deserialize, Debug, Default)]
