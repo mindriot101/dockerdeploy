@@ -56,3 +56,14 @@ pub struct HeartbeatConfig {
     pub(crate) sleep_time: i64,
     pub(crate) endpoint: String,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_example_config() {
+        // This test makes sure the example config stays in line with the parsing code.
+        let _config = DockerDeployConfig::from_file("config.toml.example");
+    }
+}
