@@ -173,12 +173,16 @@ impl<D: DockerApi> Controller<D> {
             .iter()
             .map(|s| s.as_ref())
             .collect();
+
+        let ports = self.cfg.container.ports.clone();
+
         let res = self
             .docker
             .run_container(crate::dockerclient::RunContainerOptions {
                 name: &self.cfg.container.name,
                 image: &image,
                 cmd,
+                ports,
             })
             .await?;
 

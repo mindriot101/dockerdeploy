@@ -40,7 +40,7 @@ pub(crate) struct ContainerConfig {
     pub(crate) mounts: Vec<MountConfig>,
 }
 
-#[derive(Deserialize, Debug, Default)]
+#[derive(Deserialize, Debug, Default, Clone)]
 pub(crate) struct PortConfig {
     pub(crate) host: u32,
     pub(crate) target: u32,

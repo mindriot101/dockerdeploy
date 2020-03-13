@@ -1,12 +1,35 @@
 use anyhow::Result;
 use async_trait::async_trait;
+use bollard::container::PortBinding;
 use bollard::Docker;
+use std::collections::HashMap;
 use tokio::stream::StreamExt;
 
 pub(crate) struct RunContainerOptions<'a> {
     pub(crate) name: &'a str,
     pub(crate) image: &'a str,
     pub(crate) cmd: Vec<&'a str>,
+    pub(crate) ports: Vec<crate::config::PortConfig>,
+}
+
+trait PortConfigMap {
+    fn to_bollard(&self) -> HashMap<String, Vec<PortBinding<String>>>;
+}
+
+impl PortConfigMap for Vec<crate::config::PortConfig> {
+    fn to_bollard(&self) -> HashMap<String, Vec<PortBinding<String>>> {
+        self.iter()
+            .map(|config| {
+                (
+                    format!("{}/tcp", config.target),
+                    vec![PortBinding {
+                        host_port: format!("{}/tcp", config.host),
+                        host_ip: format!("0.0.0.0"),
+                    }],
+                )
+            })
+            .collect()
+    }
 }
 
 pub(crate) struct CreateImageOptions<'a> {
@@ -79,14 +102,22 @@ impl DockerApi for bollard::Docker {
         &'a self,
         options: RunContainerOptions<'a>,
     ) -> Result<CreateContainerResults> {
-        use bollard::container::{Config, CreateContainerOptions, StartContainerOptions};
+        use bollard::container::{
+            Config, CreateContainerOptions, HostConfig, StartContainerOptions,
+        };
 
         let c_options = Some(CreateContainerOptions { name: options.name });
 
-        let cmd = options.cmd;
+        let host_config = Some(HostConfig {
+            port_bindings: Some(options.ports.to_bollard()),
+            ..Default::default()
+        });
+
+        let cmd = options.cmd.iter().map(|s| s.to_string()).collect();
         let config = Config {
-            image: Some(options.image),
+            image: Some(options.image.to_string()),
             cmd: Some(cmd),
+            host_config,
             ..Default::default()
         };
 
