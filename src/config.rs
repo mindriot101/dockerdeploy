@@ -46,7 +46,7 @@ pub(crate) struct PortConfig {
     pub(crate) target: u32,
 }
 
-#[derive(Deserialize, Debug, Default)]
+#[derive(Deserialize, Debug, Default, Clone)]
 pub(crate) struct MountConfig {
     pub(crate) host: String,
     pub(crate) target: String,
