@@ -1,12 +1,15 @@
 use anyhow::Result;
 use async_trait::async_trait;
+use bollard::container::PortBinding;
 use bollard::Docker;
+use std::collections::HashMap;
 use tokio::stream::StreamExt;
 
 pub(crate) struct RunContainerOptions<'a> {
     pub(crate) name: &'a str,
     pub(crate) image: &'a str,
     pub(crate) cmd: Vec<&'a str>,
+    pub(crate) ports: Vec<crate::config::PortConfig>,
 }
 
 pub(crate) struct CreateImageOptions<'a> {
@@ -79,14 +82,43 @@ impl DockerApi for bollard::Docker {
         &'a self,
         options: RunContainerOptions<'a>,
     ) -> Result<CreateContainerResults> {
-        use bollard::container::{Config, CreateContainerOptions, StartContainerOptions};
+        use bollard::container::{
+            Config, CreateContainerOptions, HostConfig, StartContainerOptions,
+        };
 
         let c_options = Some(CreateContainerOptions { name: options.name });
 
-        let cmd = options.cmd;
+        let port_bindings = options
+            .ports
+            .iter()
+            .map(|config| {
+                (
+                    format!("{}/tcp", config.target),
+                    vec![PortBinding {
+                        host_ip: "0.0.0.0".to_string(),
+                        host_port: format!("{}/tcp", config.host),
+                    }],
+                )
+            })
+            .collect();
+
+        let host_config = Some(HostConfig {
+            port_bindings: Some(port_bindings),
+            ..Default::default()
+        });
+
+        let exposed_ports = options
+            .ports
+            .iter()
+            .map(|config| (format!("{}/tcp", config.target), HashMap::new()))
+            .collect();
+
+        let cmd = options.cmd.iter().map(|s| (*s).to_string()).collect();
         let config = Config {
-            image: Some(options.image),
+            image: Some(options.image.to_string()),
             cmd: Some(cmd),
+            exposed_ports: Some(exposed_ports),
+            host_config,
             ..Default::default()
         };
 
