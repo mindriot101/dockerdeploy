@@ -175,6 +175,7 @@ impl<D: DockerApi> Controller<D> {
             .collect();
 
         let ports = self.cfg.container.ports.clone();
+        let mounts = self.cfg.container.mounts.clone();
 
         let res = self
             .docker
@@ -183,6 +184,7 @@ impl<D: DockerApi> Controller<D> {
                 image: &image,
                 cmd,
                 ports,
+                mounts,
             })
             .await?;
 

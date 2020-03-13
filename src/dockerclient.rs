@@ -10,6 +10,7 @@ pub(crate) struct RunContainerOptions<'a> {
     pub(crate) image: &'a str,
     pub(crate) cmd: Vec<&'a str>,
     pub(crate) ports: Vec<crate::config::PortConfig>,
+    pub(crate) mounts: Vec<crate::config::MountConfig>,
 }
 
 pub(crate) struct CreateImageOptions<'a> {
@@ -88,6 +89,18 @@ impl DockerApi for bollard::Docker {
 
         let c_options = Some(CreateContainerOptions { name: options.name });
 
+        let cwd = std::env::current_dir()?;
+
+        let binds = options
+            .mounts
+            .iter()
+            .map(|config| {
+                let host_path = cwd.join(config.host.replace("$PWD", &cwd.to_string_lossy()));
+
+                format!("{}:{}", host_path.to_string_lossy(), config.target)
+            })
+            .collect();
+
         let port_bindings = options
             .ports
             .iter()
@@ -103,6 +116,7 @@ impl DockerApi for bollard::Docker {
             .collect();
 
         let host_config = Some(HostConfig {
+            binds: Some(binds),
             port_bindings: Some(port_bindings),
             ..Default::default()
         });
