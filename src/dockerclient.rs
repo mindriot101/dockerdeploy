@@ -95,7 +95,7 @@ impl DockerApi for bollard::Docker {
                 (
                     format!("{}/tcp", config.target),
                     vec![PortBinding {
-                        host_ip: format!("0.0.0.0"),
+                        host_ip: "0.0.0.0".to_string(),
                         host_port: format!("{}/tcp", config.host),
                     }],
                 )
@@ -113,7 +113,7 @@ impl DockerApi for bollard::Docker {
             .map(|config| (format!("{}/tcp", config.target), HashMap::new()))
             .collect();
 
-        let cmd = options.cmd.iter().map(|s| s.to_string()).collect();
+        let cmd = options.cmd.iter().map(|s| (*s).to_string()).collect();
         let config = Config {
             image: Some(options.image.to_string()),
             cmd: Some(cmd),
