@@ -12,26 +12,6 @@ pub(crate) struct RunContainerOptions<'a> {
     pub(crate) ports: Vec<crate::config::PortConfig>,
 }
 
-trait PortConfigMap {
-    fn to_bollard(&self) -> HashMap<String, Vec<PortBinding<String>>>;
-}
-
-impl PortConfigMap for Vec<crate::config::PortConfig> {
-    fn to_bollard(&self) -> HashMap<String, Vec<PortBinding<String>>> {
-        self.iter()
-            .map(|config| {
-                (
-                    format!("{}/tcp", config.target),
-                    vec![PortBinding {
-                        host_port: format!("{}/tcp", config.host),
-                        host_ip: format!("0.0.0.0"),
-                    }],
-                )
-            })
-            .collect()
-    }
-}
-
 pub(crate) struct CreateImageOptions<'a> {
     pub(crate) from_image: &'a str,
     pub(crate) tag: &'a str,
@@ -108,15 +88,36 @@ impl DockerApi for bollard::Docker {
 
         let c_options = Some(CreateContainerOptions { name: options.name });
 
+        let port_bindings = options
+            .ports
+            .iter()
+            .map(|config| {
+                (
+                    format!("{}/tcp", config.target),
+                    vec![PortBinding {
+                        host_ip: format!("0.0.0.0"),
+                        host_port: format!("{}/tcp", config.host),
+                    }],
+                )
+            })
+            .collect();
+
         let host_config = Some(HostConfig {
-            port_bindings: Some(options.ports.to_bollard()),
+            port_bindings: Some(port_bindings),
             ..Default::default()
         });
+
+        let exposed_ports = options
+            .ports
+            .iter()
+            .map(|config| (format!("{}/tcp", config.target), HashMap::new()))
+            .collect();
 
         let cmd = options.cmd.iter().map(|s| s.to_string()).collect();
         let config = Config {
             image: Some(options.image.to_string()),
             cmd: Some(cmd),
+            exposed_ports: Some(exposed_ports),
             host_config,
             ..Default::default()
         };
